@@ -1,6 +1,5 @@
 use std::io::{self, BufRead};
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 struct Counts {
     two: i32,

@@ -88,37 +88,34 @@ func parseMapping(input_str string) []LookupTableRow {
 
         existing_lut_row := lut_list[lut_row_num]
 
-        if existing_lut_row.range_length != -3 {
-            // Encountering a default.
-            new_lut_rows := []LookupTableRow{}
+        new_lut_rows := []LookupTableRow{}
 
-            new_continues_after := true
-            existing_lut_row_new_length := existing_lut_row.range_length
-            if existing_lut_row.range_length > -1 {
-                existing_ending_at := existing_lut_row.range_start + existing_lut_row.range_length
-                new_ending_at := mapping_row.source_range_start + mapping_row.range_length
-                if existing_ending_at < new_ending_at {
-                    existing_lut_row_new_length = new_ending_at - existing_ending_at
-                } else {
-                    new_continues_after = false
-                }
-
+        new_continues_after := true
+        existing_lut_row_new_length := existing_lut_row.range_length
+        if existing_lut_row.range_length > -1 {
+            existing_ending_at := existing_lut_row.range_start + existing_lut_row.range_length
+            new_ending_at := mapping_row.source_range_start + mapping_row.range_length
+            if existing_ending_at < new_ending_at {
+                existing_lut_row_new_length = new_ending_at - existing_ending_at
+            } else {
+                new_continues_after = false
             }
 
-            if existing_lut_row.range_start != mapping_row.source_range_start && new_continues_after {
-                // Not hitting exact, append row before
-                new_lut_rows = append(new_lut_rows, existing_lut_row)
-            }
-            new_lut_rows = append(new_lut_rows, LookupTableRow{ mapping_row.source_range_start, mapping_row.dest_range_start - mapping_row.source_range_start, mapping_row.range_length })
-            new_lut_rows = append(new_lut_rows, LookupTableRow{ mapping_row.source_range_start + mapping_row.range_length, existing_lut_row.range_offset, existing_lut_row_new_length })
-
-            temp_lut_list := []LookupTableRow{}
-            if lut_row_num > 0 {
-                temp_lut_list = lut_list[:lut_row_num]
-            }
-            temp_lut_list = append(temp_lut_list, new_lut_rows...)
-            lut_list = append(temp_lut_list, lut_list[lut_row_num+1:]...)
         }
+
+        if existing_lut_row.range_start != mapping_row.source_range_start && new_continues_after {
+            // Not hitting exact, append row before
+            new_lut_rows = append(new_lut_rows, existing_lut_row)
+        }
+        new_lut_rows = append(new_lut_rows, LookupTableRow{ mapping_row.source_range_start, mapping_row.dest_range_start - mapping_row.source_range_start, mapping_row.range_length })
+        new_lut_rows = append(new_lut_rows, LookupTableRow{ mapping_row.source_range_start + mapping_row.range_length, existing_lut_row.range_offset, existing_lut_row_new_length })
+
+        temp_lut_list := []LookupTableRow{}
+        if lut_row_num > 0 {
+            temp_lut_list = lut_list[:lut_row_num]
+        }
+        temp_lut_list = append(temp_lut_list, new_lut_rows...)
+        lut_list = append(temp_lut_list, lut_list[lut_row_num+1:]...)
     }
 
     return lut_list

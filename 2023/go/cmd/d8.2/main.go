@@ -29,6 +29,19 @@ func getInstruction(ins_list string, ins_num int64) byte {
     return ins_list[ins_num_safe]
 }
 
+// Function to compute the Greatest Common Divisor (GCD) using the Euclidean algorithm.
+func findGCD(a, b int64) int64 {
+    for b != 0 {
+        a, b = b, a%b
+    }
+    return a
+}
+
+// Function to compute the LCM.
+func findLCM(a, b int64) int64 {
+    return (a * b) / findGCD(a, b)
+}
+
 func main() {
     var filename = flag.String("f", "../inputs/d8.sample1.txt", "file to use")
     flag.Parse()
@@ -103,42 +116,44 @@ func main() {
 
     total := -1
 
-    current_index_list := starting_index_list
-    var current_ins byte
-    var next_name_list []string
-    for step_i := range 1_000_000_000 {
-        // Detect the finish
-        is_finished := true
-        for _,test_idx := range current_index_list {
-            if node_list[test_idx].name[2] != 'Z' {
-                is_finished = false
+    step_counts_list := []int64{}
+    for _,starting_index := range starting_index_list {
+        fmt.Println("Processing next index")
+        current_index := starting_index
+        var current_ins byte
+        var current_node GraphNode
+        for step_i := range 100_000 {
+            current_node = node_list[current_index]
+            if current_node.name[2] == 'Z' {
+                step_counts_list = append(step_counts_list, int64(step_i))
                 break
             }
-        }
-        if is_finished {
-            total = step_i
-            break
-        }
+            current_ins = getInstruction(instructions_str, int64(step_i))
 
-        // Not finished? Well, then, we continue. 
-        current_ins = getInstruction(instructions_str, int64(step_i))
-
-        next_index_list := []int64{}
-        next_name_list = []string{}
-        for _,current_index := range current_index_list {
             if current_ins == 'L' {
-                next_index_list = append(next_index_list, node_list[current_index].left_index)
-                next_name_list = append(next_name_list, node_list[current_index].left_name)
+                current_index = current_node.left_index
+                //fmt.Printf("Node: %v => %c %s \n", current_node, current_ins, current_node.left_name)
             } else {
-                next_index_list = append(next_index_list, node_list[current_index].right_index)
-                next_name_list = append(next_name_list, node_list[current_index].right_name)
+                current_index = current_node.right_index
+                //fmt.Printf("Node: %v => %c %s \n", current_node, current_ins, current_node.right_name)
+            }
+            if current_index < 0 {
+                current_index = starting_index
+                continue
             }
         }
-        current_index_list = next_index_list
-        fmt.Printf("Node: %v %c %v\n", current_index_list, current_ins, next_name_list)
     }
 
+    total_lcm := int64(len(instructions_str))
+    fmt.Printf("LCM: %d\n", total_lcm)
+    for _,step_count := range step_counts_list {
+        total_lcm = findLCM(total_lcm, step_count)
+        fmt.Printf("LCM: %d\n", total_lcm)
+    }
+    total = int(total_lcm)
 
+
+    fmt.Printf("Step count list: %v\n", step_counts_list)
     //fmt.Printf("node_list: %v\n", node_list)
     fmt.Printf("T: %d\n", total)
 }

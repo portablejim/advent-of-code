@@ -39,6 +39,7 @@ func splitSpaceSepNums(num_list_str string) []int64 {
 
 func main() {
     var filename = flag.String("f", "../inputs/d9.sample.txt", "file to use")
+    var part2 = flag.Bool("part2", false, "part 2")
     flag.Parse()
     dat, err := os.ReadFile(*filename)
     if err != nil {
@@ -58,6 +59,11 @@ func main() {
         }
 
         line_split := splitSpaceSepNums(f_line)
+        if *part2 {
+            for i, j := 0, len(line_split)-1; i < j; i, j = i+1, j-1 {
+                line_split[i], line_split[j] = line_split[j], line_split[i]
+            }
+        }
 
         history_list = append(history_list, HistoryRecord{line_split, [][]int64{}, false, 0})
     }

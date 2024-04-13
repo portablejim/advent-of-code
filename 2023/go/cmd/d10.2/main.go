@@ -292,9 +292,9 @@ func main() {
             fmt.Printf("Invalid positions: %v %v | %d\n", current_left_pos, current_right_pos, dist)
             return
         }
-        fmt.Printf("CLP: %v | CRP: %v\n", current_left_pos, current_right_pos)
-        fmt.Printf("CFL: %s \n", current_left_from)
-        fmt.Printf("CFR: %s \n", current_right_from)
+        //fmt.Printf("CLP: %v | CRP: %v\n", current_left_pos, current_right_pos)
+        //fmt.Printf("CFL: %s \n", current_left_from)
+        //fmt.Printf("CFR: %s \n", current_right_from)
 
         current_left := &pipe_graph[current_left_pos.y][current_left_pos.x]
         current_right := &pipe_graph[current_right_pos.y][current_right_pos.x]
@@ -313,7 +313,7 @@ func main() {
             current_right.distance = dist
         }
 
-        fmt.Printf("CL: %v | CR: %v\n", *current_left, *current_right)
+        //fmt.Printf("CL: %v | CR: %v\n", *current_left, *current_right)
 
         are_both_nodes_filled := (current_left.left.x > -1 && current_left.right.x > -1) && (current_right.left.x > -1 && current_right.right.x > -1)
         if doCoordsMatch(current_left_pos, current_right_pos) || are_both_nodes_filled {
@@ -322,7 +322,7 @@ func main() {
         }
 
         next_dir_left := getOtherValidDir(current_left.symbol, inverseDir(current_left_from))
-        fmt.Printf("NDL: %s => %s\n", current_left_from, next_dir_left)
+        //fmt.Printf("NDL: %s => %s\n", current_left_from, next_dir_left)
         next_pos_left := move(next_dir_left, current_left_pos, len(pipe_graph), len(pipe_graph[0]))
 
         prev_pos_left = current_left_pos
@@ -330,7 +330,7 @@ func main() {
         current_left_from = next_dir_left
 
         next_dir_right := getOtherValidDir(current_right.symbol, inverseDir(current_right_from))
-        fmt.Printf("NDR: %s => %s\n", current_right_from, next_dir_right)
+        //fmt.Printf("NDR: %s => %s\n", current_right_from, next_dir_right)
         next_pos_right := move(next_dir_right, current_right_pos, len(pipe_graph), len(pipe_graph[0]))
 
         prev_pos_right = current_right_pos
@@ -345,15 +345,12 @@ func main() {
         is_inside := false
         wall_start := ""
         is_wall := false
-        fmt.Printf("\n")
         for _,n_x := range n_y {
             if n_x.distance >= 0 {
-                fmt.Printf("Y?: %v %v %v %v\n", is_inside, wall_start, is_wall, n_x)
                 if is_wall {
                     if (wall_start == "L" && n_x.symbol == "J") || (wall_start == "F" && n_x.symbol == "7") {
                         is_wall = false
                         wall_start = ""
-                        //is_inside = false
                     }
                     if (wall_start == "L" && n_x.symbol == "7") || (wall_start == "F" && n_x.symbol == "J") {
                         is_wall = false
@@ -368,69 +365,21 @@ func main() {
                     is_wall = true
                     wall_start = n_x.symbol
                 }
-                /*
-                if n_x.symbol == "F" || n_x.symbol == "L" {
-                    is_inside = true
-                }
-                if n_x.symbol == "7" || n_x.symbol == "J" {
-                    is_inside = false
-                }
-                */
-                if n_x.symbol == "|" {
-                    //is_inside = !is_inside
-                }
             } else {
-                fmt.Printf("YC: %v %v %v %v\n", is_inside, wall_start, is_wall, n_x)
                 if is_inside {
                     inside_y = append(inside_y, n_x.pos)
                 }
             }
         }
     }
-    inside_x := []Coord{}
-    for xi_x := range len(pipe_graph[0]) {
-        is_wall := false
-        is_inside := false
-        //fmt.Printf("Line\n")
-        for xi_y := range len(pipe_graph) {
-            //fmt.Printf("X?: %v %v\n", is_inside, pipe_graph[xi_y][xi_x])
-            if pipe_graph[xi_y][xi_x].distance >= 0 {
-                if !is_wall || pipe_graph[xi_y][xi_x].symbol == "-" {
-                    is_inside = !is_inside
-                    is_wall = true
-                }
-            } else {
-                is_wall = false
-                if is_inside {
-                    inside_x = append(inside_x, pipe_graph[xi_y][xi_x].pos)
-                }
-            }
-        }
-    }
 
-    inside_points := []Coord{}
-    for _,candidate_x := range inside_x {
-        for _,candidate_y := range inside_y {
-            if candidate_x.x > 0 && doCoordsMatch(candidate_x, candidate_y) {
-                inside_count += 1
-                inside_points = append(inside_points, candidate_x)
-            }
-        }
-    }
-    fmt.Printf("\n")
-    printGraph(pipe_graph, inside_points)
+    inside_points := inside_y
+    inside_count = len(inside_points)
     fmt.Printf("\n")
     printGraph(pipe_graph, inside_y)
-    fmt.Printf("\n")
-    printGraph(pipe_graph, inside_x)
 
 
     fmt.Printf("Start: %v\n", start_pos)
-    fmt.Printf("Inside Y: %d %v\n", len(inside_y), inside_y)
-    fmt.Printf("Inside X: %d %v\n", len(inside_x), inside_x)
-    fmt.Printf("Inside XY: %d %v\n", len(inside_points), inside_points)
-    //fmt.Printf("numbers list 1: %v\n", numbers_list)
-    //fmt.Printf("numbers map: %v\n", numbers_map)
     fmt.Printf("T: %d\n", total)
     fmt.Printf("Inside: %d\n", inside_count)
 }

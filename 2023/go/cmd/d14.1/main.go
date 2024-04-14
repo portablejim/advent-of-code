@@ -48,6 +48,23 @@ func reverseArray(line_split []string) []string {
     return output
 }
 
+func turnPlatform(input_lines []string) []string {
+    output := []string{}
+
+    if len(input_lines) > 0 {
+        for c_num_forward := range len(input_lines[0]) {
+            c_num := len(input_lines[0]) - 1 - c_num_forward
+            output_line := ""
+            for _,current_line := range input_lines {
+                output_line += string(current_line[c_num])
+            }
+            output = append(output, output_line)
+        }
+    }
+
+    return output
+}
+
 func tiltPlatform(line_list []string) []string {
     output := []string{}
 
@@ -125,8 +142,10 @@ func main() {
 
     total := 0
 
-    data_lines_1 := tiltPlatform(transposeLines(data_lines))
-    data_lines_2 := transposeLines(data_lines_1)
+    data_lines_1 := tiltPlatform(turnPlatform(data_lines))
+    data_lines_2 := turnPlatform(data_lines_1)
+    data_lines_2 = turnPlatform(data_lines_2)
+    data_lines_2 = turnPlatform(data_lines_2)
     data_lines_counted := countWeights(data_lines_2)
     for _,l := range data_lines_counted {
         fmt.Printf("R: %v\n", l)

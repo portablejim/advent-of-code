@@ -53,9 +53,10 @@ func turnPlatform(input_lines []string) []string {
 
     if len(input_lines) > 0 {
         for c_num_forward := range len(input_lines[0]) {
-            c_num := len(input_lines[0]) - 1 - c_num_forward
+            c_num := c_num_forward
             output_line := ""
-            for _,current_line := range input_lines {
+            for l_num_forward := range input_lines {
+                current_line := input_lines[len(input_lines) - 1 - l_num_forward]
                 output_line += string(current_line[c_num])
             }
             output = append(output, output_line)
@@ -70,16 +71,16 @@ func tiltPlatform(line_list []string) []string {
 
     for _,line := range line_list {
         line_arr := strings.Split(line, "")
-        line_i := 0
+        line_i := len(line) - 1
         //has_moved_rock := false
         has_solid_base := true
-        for line_i < len(line) {
+        for line_i >= 0 {
             if line_arr[line_i] == "." {
-                look_i := line_i + 1
+                look_i := line_i - 1
 
                 // Needs to place rock on solid item.
                 if has_solid_base {
-                    for look_i < len(line) {
+                    for look_i >= 0 {
                         if line_arr[look_i] == "O" {
                             // Found a rock, move it.
                             line_arr[look_i], line_arr[line_i] = line_arr[line_i], line_arr[look_i]
@@ -92,13 +93,13 @@ func tiltPlatform(line_list []string) []string {
                             break
                         }
                         has_solid_base = false
-                        look_i += 1
+                        look_i -= 1
                     }
                 }
             } else {
                 has_solid_base = true
             }
-            line_i += 1
+            line_i -= 1
         }
         output = append(output, strings.Join(line_arr, ""))
     }
@@ -142,11 +143,21 @@ func main() {
 
     total := 0
 
-    data_lines_1 := tiltPlatform(turnPlatform(data_lines))
-    data_lines_2 := turnPlatform(data_lines_1)
-    data_lines_2 = turnPlatform(data_lines_2)
-    data_lines_2 = turnPlatform(data_lines_2)
-    data_lines_counted := countWeights(data_lines_2)
+    dirs := []string{ "N", "W", "S", "E" }
+
+    data_lines_turned := turnPlatform(data_lines)
+    if *part2 {
+        for i := 0; i < 4; i += 1 {
+            data_lines_turned = turnPlatform(tiltPlatform(data_lines_turned))
+            fmt.Printf("%s: %v\n", dirs[i], data_lines_turned)
+        }
+    } else {
+        data_lines_turned = tiltPlatform(data_lines_turned)
+    }
+    data_lines_turned = turnPlatform(data_lines_turned)
+    data_lines_turned = turnPlatform(data_lines_turned)
+    data_lines_turned = turnPlatform(data_lines_turned)
+    data_lines_counted := countWeights(data_lines_turned)
     for _,l := range data_lines_counted {
         fmt.Printf("R: %v\n", l)
         total += l.weight

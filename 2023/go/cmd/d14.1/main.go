@@ -16,36 +16,11 @@ type RoadLine struct {
     weight int
 }
 
-
-func transposeLines(input_lines []string) []string {
-    output := []string{}
-
-    if len(input_lines) > 0 {
-        for c_num := range len(input_lines[0]) {
-            output_line := ""
-            for _,current_line := range input_lines {
-                output_line += string(current_line[c_num])
-            }
-            output = append(output, output_line)
-        }
-    }
-
-    return output
-}
-
-
-func reverseArray(line_split []string) []string {
-    output := []string{}
-    for i := len(line_split)-1; i >= 0; i -= 1 {
-        output = append(output, line_split[i])
-    }
-    /*
-    for i, j := 0, len(line_split)-1; i < j; i, j = i+1, j-1 {
-        line_split[i], line_split[j] = line_split[j], line_split[i]
-    }
-    */
-
-    return output
+type CycleNode struct {
+    hash string
+    value []string
+    next_hash string
+    visited_at int
 }
 
 func turnPlatform(input_lines []string) []string {
@@ -107,6 +82,98 @@ func tiltPlatform(line_list []string) []string {
     return output
 }
 
+func runWashCycle(input_lines []string, num_cycles int) []string {
+    //dirs := []string{ "N", "W", "S", "E" }
+    wash_graph := map[string]CycleNode{}
+    has_hashes := false
+    prev_hash := ""
+    cur_hash := ""
+    loop_size := -1
+    loop_offset := -1
+
+    for c_num := 0; c_num < num_cycles; c_num += 1 {
+        if loop_size > -1 && loop_offset > -1 {
+            target_offset := (num_cycles - loop_offset) % loop_size
+            current_offset := (c_num - loop_offset) % loop_size
+
+            fmt.Printf("Found loop: %d %d %d %d\n", target_offset, current_offset, loop_size, loop_offset)
+            if current_offset == target_offset {
+                fmt.Printf("G: %v\n", wash_graph[cur_hash])
+                input_lines = wash_graph[cur_hash].value
+                break
+            }
+
+            prev_hash = cur_hash
+            cur_hash = wash_graph[prev_hash].next_hash
+            continue
+        }
+        for i := 0; i < 4; i += 1 {
+            input_lines = turnPlatform(tiltPlatform(input_lines))
+        }
+
+        prev_hash = cur_hash
+        cur_hash = hash_data(input_lines)
+        has_hashes = prev_hash != ""
+        current_node, hash_in_graph := wash_graph[cur_hash]
+        if hash_in_graph {
+            if current_node.visited_at < 0 {
+                fmt.Printf("Error: node should be visited %d %s->%s\n", c_num, prev_hash, cur_hash)
+                panic("Error with nodes")
+            }
+            loop_offset = current_node.visited_at
+            loop_size = c_num - current_node.visited_at
+        } else {
+            temp_lines := []string{}
+            for _,l := range input_lines {
+                temp_lines = append(temp_lines, l)
+            }
+            current_node = CycleNode{cur_hash, temp_lines, "", c_num}
+        }
+        wash_graph[cur_hash] = current_node
+        if has_hashes {
+            prev_node,has_prev := wash_graph[prev_hash]
+            if has_prev {
+                prev_node.next_hash = cur_hash
+                wash_graph[prev_hash] = prev_node
+            }
+        }
+        fmt.Printf("Wash %d: %s => %s (%d) %d %d\n", c_num, prev_hash, cur_hash, len(wash_graph), loop_size, loop_offset)
+    }
+    return input_lines
+}
+
+func hash_data(input_lines []string) string {
+    output := ""
+    current_counter := 0
+    num_ops := 0
+    for _,input_line := range input_lines {
+        for _,input_char := range input_line {
+            current_counter *= 2
+            if input_char == 'O' {
+                current_counter += 1
+            }
+            num_ops += 1
+
+            if num_ops == 6 {
+                current_shifted := '0' + current_counter
+                output += string(rune(current_shifted))
+                current_counter = 0
+                num_ops = 0
+            }
+        }
+    }
+    if num_ops > 0 {
+        for num_ops < 6 {
+            current_counter *= 2
+            num_ops += 1
+        }
+        current_shifted := '0' + current_counter
+        output += string(rune(current_shifted))
+    }
+
+    return output
+}
+
 func countWeights(input_lines []string) []RoadLine {
     output := []RoadLine{}
 
@@ -143,14 +210,9 @@ func main() {
 
     total := 0
 
-    dirs := []string{ "N", "W", "S", "E" }
-
     data_lines_turned := turnPlatform(data_lines)
     if *part2 {
-        for i := 0; i < 4; i += 1 {
-            data_lines_turned = turnPlatform(tiltPlatform(data_lines_turned))
-            fmt.Printf("%s: %v\n", dirs[i], data_lines_turned)
-        }
+        data_lines_turned = runWashCycle(data_lines_turned, 1_000_000_000)
     } else {
         data_lines_turned = tiltPlatform(data_lines_turned)
     }
@@ -163,10 +225,7 @@ func main() {
         total += l.weight
     }
 
-
-    //fmt.Printf("Start: %v\n", start_pos)
     //fmt.Printf("numbers list 1: %v\n", numbers_list)
-    //fmt.Printf("numbers map: %v\n", numbers_map)
     fmt.Printf("T: %d (part2: %t)\n", total, *part2)
 }
 

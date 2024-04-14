@@ -106,7 +106,7 @@ func transposeLines(input_lines []string) []string {
 
 func main() {
     var filename = flag.String("f", "../inputs/d10.sample1.txt", "file to use")
-    //var num_copies = flag.Int("copies", 1, "number of copies")
+    var part2 = flag.Bool("part2", false, "do part 2")
     flag.Parse()
     dat, err := os.ReadFile(*filename)
     if err != nil {
@@ -134,9 +134,9 @@ func main() {
 
     for d_n := range len(data_patterns) {
         current_pattern := *&data_patterns[d_n]
-        current_pattern.v_mirror = findMirror(transposeLines(current_pattern.ground_pattern), "R", true)
+        current_pattern.v_mirror = findMirror(transposeLines(current_pattern.ground_pattern), "R", *part2)
         if current_pattern.v_mirror < 0 {
-            current_pattern.h_mirror = findMirror(current_pattern.ground_pattern, "C", true)
+            current_pattern.h_mirror = findMirror(current_pattern.ground_pattern, "C", *part2)
         }
         h_mirror_num := current_pattern.h_mirror + 1
         v_mirror_num := current_pattern.v_mirror + 1

@@ -44,11 +44,35 @@ func moveDirection(direction rune, pos CruciblePosition) CruciblePosition {
     } 
 }
 
-func getNextDirections(direction rune, previous_directions string) []rune {
+func getNextDirections(direction rune, previous_directions string, min_before_turn int, max_before_turn int) []rune {
     output := []rune{}
 
+    // Not enough directions exist yet before turning.
+    if len(previous_directions) < min_before_turn {
+        fmt.Printf("Forced straight 1: %d < %d\n", len(previous_directions), min_before_turn)
+        output = append(output, direction)
+        return output
+    }
+
+    // Count num taken in each direction.
+    count_same_direction := 0
+    for i := len(previous_directions)-1; i >= 0 && count_same_direction <= (max_before_turn+1); i -= 1 {
+        if previous_directions[i] != byte(direction) {
+            break
+        }
+        count_same_direction += 1
+    }
+
+    // Not enough of the same direction to turn.
+    if count_same_direction < min_before_turn {
+        output = append(output, direction)
+        fmt.Printf("Forced straight 2: %d < %d\n", count_same_direction, min_before_turn)
+        return output
+    }
+
     can_move_same := true
-    if len(previous_directions) >= 3 && previous_directions[len(previous_directions)-1] == byte(direction) && previous_directions[len(previous_directions)-2] == byte(direction) && previous_directions[len(previous_directions)-3] == byte(direction) {
+    if count_same_direction >= max_before_turn {
+        fmt.Printf("Forced turn: %d > %d\n", count_same_direction, max_before_turn)
         can_move_same = false
     }
 
@@ -66,7 +90,7 @@ func getNextDirections(direction rune, previous_directions string) []rune {
     return output
 }
 
-func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list []CruciblePosition, graph_nodes [][]GraphNode) (int, string) {
+func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list []CruciblePosition, graph_nodes [][]GraphNode, min_before_turn int, max_before_turn int) (int, string) {
         ending_node := ending_nodes_list[s_i]
 
         pending_positions := []CruciblePosition{}
@@ -94,7 +118,7 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
             }
             current_node := &graph_nodes[current_pos.y][current_pos.x]
             new_cost := prev_node.lowest_cost + current_node.cost
-            //fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
+            fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
             if new_cost < 0 || new_cost >= current_node.lowest_cost {
                 // Higher cost, don't continue.
                 //fmt.Printf("Expire (cost): %d > %d | %s\n", new_cost, current_node.lowest_cost, current_pos.history)
@@ -111,7 +135,7 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
                 fmt.Printf("Possible lowest: %v\n", current_pos)
             }
 
-            for _,next_dir := range getNextDirections(current_pos.direction, current_pos.history) {
+            for _,next_dir := range getNextDirections(current_pos.direction, current_pos.history, min_before_turn, max_before_turn) {
                 pending_positions = append(pending_positions, CruciblePosition{next_dir, current_pos.history, current_pos.y, current_pos.x, false})
             }
             //fmt.Printf("Next: %v\n", pending_positions)
@@ -145,6 +169,7 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 
 func main() {
     var filename = flag.String("f", "../inputs/d17.sample.txt", "file to use")
+    var part2 = flag.Bool("part2", false, "do part 2")
     flag.Parse()
     dat, err := os.ReadFile(*filename)
     if err != nil {
@@ -184,8 +209,15 @@ func main() {
     total := math.MaxInt64
     first_total := math.MaxInt64
 
+    min_before_turn := 0
+    max_before_turn := 3
+    if *part2 {
+        min_before_turn = 4
+        max_before_turn = 10
+    }
+
     for s_i,starting_nodes := range starting_nodes_list {
-        current_cost, current_cost_path := getLowestCost(s_i, starting_nodes, ending_nodes_list, graph_nodes)
+        current_cost, current_cost_path := getLowestCost(s_i, starting_nodes, ending_nodes_list, graph_nodes, min_before_turn, max_before_turn)
         fmt.Printf("Cost: %d, %s\n", current_cost, current_cost_path)
         if current_cost < total {
             total = current_cost

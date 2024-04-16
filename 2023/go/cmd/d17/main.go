@@ -24,6 +24,7 @@ type FloorTile struct {
 type CruciblePosition struct {
 	direction   rune
 	history     string
+	cost        int
 	y           int
 	x           int
 	is_starting bool
@@ -32,15 +33,15 @@ type CruciblePosition struct {
 func moveDirection(direction rune, pos CruciblePosition) CruciblePosition {
 	next_history := pos.history + string(direction)
 	if direction == rune('N') {
-		return CruciblePosition{'N', next_history, pos.y - 1, pos.x, false}
+		return CruciblePosition{'N', next_history, pos.cost, pos.y - 1, pos.x, false}
 	} else if direction == rune('E') {
-		return CruciblePosition{'E', next_history, pos.y, pos.x + 1, false}
+		return CruciblePosition{'E', next_history, pos.cost, pos.y, pos.x + 1, false}
 	} else if direction == rune('S') {
-		return CruciblePosition{'S', next_history, pos.y + 1, pos.x, false}
+		return CruciblePosition{'S', next_history, pos.cost, pos.y + 1, pos.x, false}
 	} else if direction == rune('W') {
-		return CruciblePosition{'W', next_history, pos.y, pos.x - 1, false}
+		return CruciblePosition{'W', next_history, pos.cost, pos.y, pos.x - 1, false}
 	} else {
-		return CruciblePosition{'0', next_history, pos.y, pos.x, false}
+		return CruciblePosition{'0', next_history, pos.cost, pos.y, pos.x, false}
 	}
 }
 
@@ -49,7 +50,7 @@ func getNextDirections(direction rune, previous_directions string, min_before_tu
 
 	// Not enough directions exist yet before turning.
 	if len(previous_directions) < min_before_turn {
-		fmt.Printf("Forced straight 1: %d < %d\n", len(previous_directions), min_before_turn)
+		//fmt.Printf("Forced straight 1: %d < %d\n", len(previous_directions), min_before_turn)
 		output = append(output, direction)
 		return output
 	}
@@ -66,13 +67,13 @@ func getNextDirections(direction rune, previous_directions string, min_before_tu
 	// Not enough of the same direction to turn.
 	if count_same_direction < min_before_turn {
 		output = append(output, direction)
-		fmt.Printf("Forced straight 2: %d < %d\n", count_same_direction, min_before_turn)
+		//fmt.Printf("Forced straight 2: %d < %d\n", count_same_direction, min_before_turn)
 		return output
 	}
 
 	can_move_same := true
 	if count_same_direction >= max_before_turn {
-		fmt.Printf("Forced turn: %d > %d\n", count_same_direction, max_before_turn)
+		//fmt.Printf("Forced turn: %d > %d\n", count_same_direction, max_before_turn)
 		can_move_same = false
 	}
 
@@ -85,7 +86,7 @@ func getNextDirections(direction rune, previous_directions string, min_before_tu
 		output = append(output, 'N', 'S')
 	}
 
-	fmt.Printf("Next dirs: %v\n", output)
+	//fmt.Printf("Next dirs: %v\n", output)
 
 	return output
 }
@@ -108,7 +109,6 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 		}
 		out_of_range := false
 		current_pos := prev_position
-		new_cost := prev_node.lowest_cost
 		// Skip over any positions where we can't turn.
 		for i := 0; i < min_moves; i += 1 {
 			prev_position = current_pos
@@ -117,22 +117,23 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 			if current_pos.y >= len(graph_nodes) || current_pos.x >= len(graph_nodes[0]) || current_pos.y < 0 || current_pos.x < 0 || current_pos.direction == '0' {
 				// Out of range, it expires.
 				//fmt.Printf("expired r: %v\n", current_end)
-				fmt.Printf("Expire (invalid): %v\n", current_pos)
+				//fmt.Printf("Expire (invalid): %v\n", current_pos)
 				out_of_range = true
 				break
 			}
-			new_cost += graph_nodes[current_pos.y][current_pos.x].cost
+			//fmt.Printf("Add cost %d + %d at %d,%d (%s)\n", current_pos.cost, graph_nodes[current_pos.y][current_pos.x].cost, current_pos.y, current_pos.x, current_pos.history)
+			current_pos.cost += graph_nodes[current_pos.y][current_pos.x].cost
 		}
 		if out_of_range {
 			continue
 		}
+		new_cost := current_pos.cost
 
 		current_node := &graph_nodes[current_pos.y][current_pos.x]
-		new_cost = prev_node.lowest_cost + current_node.cost
-		fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
+		//fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
 		if new_cost < 0 || new_cost >= current_node.lowest_cost {
 			// Higher cost, don't continue.
-			fmt.Printf("Expire (cost): %d > %d | %s | %s\n", new_cost, current_node.lowest_cost, current_pos.history, prev_position.history)
+			//fmt.Printf("Expire (cost): %d > %d | %s | %s\n", new_cost, current_node.lowest_cost, current_pos.history, current_node.lowest_cost_path)
 			continue
 		}
 
@@ -144,13 +145,14 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 			// Found the end.
 			//return current_node.lowest_cost, current_node.lowest_cost_path
 			fmt.Printf("Possible lowest: %v %v %v\n", current_pos, *current_node, prev_node)
+			continue
 		}
 
 		for _, next_dir := range getNextDirections(current_pos.direction, current_pos.history, min_before_turn, max_before_turn) {
-			pending_positions = append(pending_positions, CruciblePosition{next_dir, current_pos.history, current_pos.y, current_pos.x, false})
+			pending_positions = append(pending_positions, CruciblePosition{next_dir, current_pos.history, current_pos.cost, current_pos.y, current_pos.x, false})
 		}
-		fmt.Printf("Next: %v\n", pending_positions)
-		fmt.Printf("Next: %d\n", len(pending_positions))
+		//fmt.Printf("Next: %v\n", pending_positions)
+		//fmt.Printf("Next: %d\n", len(pending_positions))
 
 		/*
 		   fmt.Printf("next: %v\n", laser_ends)
@@ -213,8 +215,8 @@ func main() {
 	max_y := len(graph_nodes) - 1
 	max_x := len(graph_nodes[0]) - 1
 
-	starting_nodes_list := [][]CruciblePosition{{{'E', "", 0, 0, true}, {'S', "", 0, 0, true}}}
-	ending_nodes_list := []CruciblePosition{{'0', "", max_y, max_x, false}}
+	starting_nodes_list := [][]CruciblePosition{{{'E', "", 0, 0, 0, true}, {'S', "", 0, 0, 0, true}}}
+	ending_nodes_list := []CruciblePosition{{'0', "", 0, max_y, max_x, false}}
 
 	total := math.MaxInt64
 	first_total := math.MaxInt64

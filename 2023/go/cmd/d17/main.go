@@ -11,7 +11,7 @@ import (
 
 type GraphNode struct {
     cost int
-    visited int
+    visited bool
     lowest_cost int
     lowest_cost_path string
 }
@@ -85,7 +85,7 @@ func getNextDirections(direction rune, previous_directions string, min_before_tu
         output = append(output, 'N', 'S')
     }
 
-    //fmt.Printf("Next dirs: %v\n", output)
+    fmt.Printf("Next dirs: %v\n", output)
 
     return output
 }
@@ -118,37 +118,14 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
             }
             current_node := &graph_nodes[current_pos.y][current_pos.x]
             new_cost := prev_node.lowest_cost + current_node.cost
-            //fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
-            if new_cost < 0 || new_cost > current_node.lowest_cost {
+            fmt.Printf("N: %v %v %v %d\n", prev_node, current_pos, *current_node, new_cost)
+            if new_cost < 0 || new_cost >= current_node.lowest_cost {
                 // Higher cost, don't continue.
                 //fmt.Printf("Expire (cost): %d > %d | %s\n", new_cost, current_node.lowest_cost, current_pos.history)
                 continue
             }
-            if new_cost == current_node.lowest_cost && current_node.visited < 2 {
-                // Same cost.
-                // Find any dir that the cheapest missed and use that.
-                missed_dirs := []rune{}
-                for _,c_dir := range getNextDirections(current_pos.direction, current_node.lowest_cost_path, min_before_turn, max_before_turn) {
-                    dir_unique := true
-                    prev_node_direction := prev_node.lowest_cost_path[len(prev_node.lowest_cost_path)-1]
-                    for _,p_dir := range getNextDirections(rune(prev_node_direction), prev_node.lowest_cost_path, min_before_turn, max_before_turn) {
-                        if c_dir == p_dir {
-                            dir_unique = false
-                            break
-                        }
-                    }
-                    if dir_unique {
-                        missed_dirs = append(missed_dirs, c_dir)
-                    }
-                }
-                current_node.visited += 1
-                fmt.Printf("Eq - missed: %v\n", missed_dirs)
-                for _,next_dir := range missed_dirs {
-                    pending_positions = append(pending_positions, CruciblePosition{next_dir, current_pos.history, current_pos.y, current_pos.x, false})
-                }
-            }
 
-            current_node.visited += 1
+            current_node.visited = true
             current_node.lowest_cost = new_cost
             current_node.lowest_cost_path = current_pos.history
 
@@ -158,24 +135,30 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
                 fmt.Printf("Possible lowest: %v\n", current_pos)
             }
 
-
             for _,next_dir := range getNextDirections(current_pos.direction, current_pos.history, min_before_turn, max_before_turn) {
                 pending_positions = append(pending_positions, CruciblePosition{next_dir, current_pos.history, current_pos.y, current_pos.x, false})
             }
             //fmt.Printf("Next: %v\n", pending_positions)
             fmt.Printf("Next: %d\n", len(pending_positions))
 
-        }
-        fmt.Printf("next: %v\n", pending_positions)
-        for _,floor_tile_line := range graph_nodes {
-            for _,floor_tile := range floor_tile_line {
-                if floor_tile.visited > 1 {
-                    fmt.Printf("%d", floor_tile.cost)
-                } else {
-                    fmt.Printf(" ")
+            /*
+            fmt.Printf("next: %v\n", laser_ends)
+            for _,floor_tile_line := range floor_tiles {
+                for _,floor_tile := range floor_tile_line {
+                    if floor_tile.visited_count > 0 {
+                        if floor_tile.visited_count > 1 {
+                            //fmt.Printf("█")
+                            fmt.Printf("#")
+                        } else {
+                            fmt.Printf("#")
+                        }
+                    } else {
+                        fmt.Printf(" ")
+                    }
                 }
+                fmt.Printf("\n")
             }
-            fmt.Printf("\n")
+            */
         }
 
         return graph_nodes[ending_node.y][ending_node.x].lowest_cost, graph_nodes[ending_node.y][ending_node.x].lowest_cost_path
@@ -205,7 +188,7 @@ func main() {
         graph_node_row := []GraphNode{}
         for c_num := 0; c_num < len(f_line); c_num += 1 {
             node_weight := f_line[c_num] - '0'
-            graph_node_row = append(graph_node_row, GraphNode{int(node_weight), 0,  math.MaxInt64, "" })
+            graph_node_row = append(graph_node_row, GraphNode{int(node_weight), false,  math.MaxInt64, "" })
         }
         graph_nodes = append(graph_nodes, graph_node_row)
     }

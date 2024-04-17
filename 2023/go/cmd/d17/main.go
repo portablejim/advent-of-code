@@ -200,6 +200,7 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 func main() {
 	var filename = flag.String("f", "../inputs/d17.sample.txt", "file to use")
 	var part2 = flag.Bool("part2", false, "do part 2")
+    var visualise = flag.String("visualise", "", "check a string")
 	flag.Parse()
 	dat, err := os.ReadFile(*filename)
 	if err != nil {
@@ -258,6 +259,7 @@ func main() {
     valid_dirs := map[string][]string{ "N": {"E", "W"}, "S": {"E", "W"}, "E": {"N", "S"}, "W": {"N", "S"} }
 
     loop_num := 0
+    if len(*visualise) == 0 {
 	for len(pending_positions) > 0 {
         loop_num += 1
 
@@ -321,7 +323,8 @@ func main() {
 					}
 
                     //next_node_key := fmt.Sprintf("%v", *&next_position)
-                    next_node_key := fmt.Sprintf("%s,%d,%d,%d", next_position.direction, next_position.y, next_position.x, next_position.cost)
+                    //next_node_key := fmt.Sprintf("%s,%d,%d,%d", next_position.direction, next_position.y, next_position.x, next_position.cost)
+                    next_node_key := fmt.Sprintf("%s,%d,%d", next_position.direction, next_position.y, next_position.x)
                     //next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
                     next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
                     if !next_node_pending_found {
@@ -367,19 +370,50 @@ func main() {
         }
 	}
 
-    for _,graph_line := range graph_nodes {
-        for _,graph_nde := range graph_line {
+    for i_y,graph_line := range graph_nodes {
+        for i_x,graph_nde := range graph_line {
             if graph_nde.lowest_cost < 10_000 {
                 fmt.Printf("%d:%4d | ", graph_nde.cost, graph_nde.lowest_cost)
             } else {
                 fmt.Printf("%d:     | ", graph_nde.cost)
             }
+            graph_nodes[i_y][i_x].visited = false
         }
         fmt.Printf("\n")
     }
 
     total = graph_nodes[ending_node.y][ending_node.x].lowest_cost
+    *visualise = graph_nodes[ending_node.y][ending_node.x].lowest_cost_path
     first_total = total
 
 	fmt.Printf("T: p1 %d p2 %d \n", first_total, total)
+	}
+
+    if len(*visualise) > 0 {
+        vis_node := starting_node
+        vis_total := 0
+        for _,dir := range *visualise {
+            vis_node = moveDirection(string(dir), vis_node)
+            if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < len(graph_nodes) && vis_node.x < len(graph_nodes[0]) {
+                graph_nodes[vis_node.y][vis_node.x].visited = true
+                add_cost := graph_nodes[vis_node.y][vis_node.x].cost
+                fmt.Printf("CT: %4d + %4d = %4d\n", vis_total, add_cost,vis_total + add_cost)
+                vis_total += add_cost
+            } else {
+                fmt.Printf("ERROR: %v\n", vis_node)
+            }
+        }
+    }
+
+    for _,graph_line := range graph_nodes {
+        for _,graph_nde := range graph_line {
+            if graph_nde.visited {
+                fmt.Printf("%d", graph_nde.cost)
+            } else {
+                //fmt.Printf(" ")
+                fmt.Printf("\u001b[31m%d\u001b[0m", graph_nde.cost)
+            }
+        }
+        fmt.Printf("\n")
+    }
 }

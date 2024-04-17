@@ -11,13 +11,19 @@ import (
 )
 
 type GraphNode struct {
-	y                int
-	x                int
-	cost             int
-	visited          bool
-	isPending        bool
-	lowest_cost      int
-	lowest_cost_path string
+	y                  int
+	x                  int
+	cost               int
+	visited            bool
+	visited_v          bool
+	visited_h          bool
+	isPending          bool
+	lowest_cost        int
+	lowest_cost_path   string
+	lowest_cost_h      int
+	lowest_cost_path_h string
+	lowest_cost_v      int
+	lowest_cost_path_v string
 }
 
 type Coord struct {
@@ -200,7 +206,7 @@ func getLowestCost(s_i int, starting_nodes []CruciblePosition, ending_nodes_list
 func main() {
 	var filename = flag.String("f", "../inputs/d17.sample.txt", "file to use")
 	var part2 = flag.Bool("part2", false, "do part 2")
-    var visualise = flag.String("visualise", "", "check a string")
+	var visualise = flag.String("visualise", "", "check a string")
 	flag.Parse()
 	dat, err := os.ReadFile(*filename)
 	if err != nil {
@@ -219,7 +225,7 @@ func main() {
 		graph_node_row := []GraphNode{}
 		for c_num := 0; c_num < len(f_line); c_num += 1 {
 			node_weight := f_line[c_num] - '0'
-			graph_node_row = append(graph_node_row, GraphNode{l_num, c_num, int(node_weight), false, false, math.MaxInt64, ""})
+			graph_node_row = append(graph_node_row, GraphNode{l_num, c_num, int(node_weight), false, false, false, false, math.MaxInt64, "", math.MaxInt64, "", math.MaxInt64, ""})
 		}
 		graph_nodes = append(graph_nodes, graph_node_row)
 	}
@@ -229,6 +235,8 @@ func main() {
 		return
 	}
 	graph_nodes[0][0].lowest_cost = 0
+	graph_nodes[0][0].lowest_cost_h = 0
+	graph_nodes[0][0].lowest_cost_v = 0
 	//fmt.Printf("floor_tile_rows: %v\n", floor_tiles)
 
 	max_y := len(graph_nodes) - 1
@@ -254,166 +262,228 @@ func main() {
 	pending_positions := []CruciblePosition{}
 	pending_positions = append(pending_positions, starting_node)
 
-    pending_pos_map := map[string]bool{}
+	pending_pos_map := map[string]bool{}
 
-    valid_dirs := map[string][]string{ "N": {"E", "W"}, "S": {"E", "W"}, "E": {"N", "S"}, "W": {"N", "S"} }
+	valid_dirs := map[string][]string{"N": {"E", "W"}, "S": {"E", "W"}, "E": {"N", "S"}, "W": {"N", "S"}}
 
-    loop_num := 0
-    if len(*visualise) == 0 {
-	for len(pending_positions) > 0 {
-        loop_num += 1
+	loop_num := 0
+	if len(*visualise) == 0 {
+		for len(pending_positions) > 0 {
+			loop_num += 1
 
-		current_position := pending_positions[0]
-		pending_positions = pending_positions[1:]
+			current_position := pending_positions[0]
+			pending_positions = pending_positions[1:]
 
-        //current_position_key := fmt.Sprintf("%v", current_position)
-        current_position_key := fmt.Sprintf("%s,%d,%d,%d", current_position.direction, current_position.y, current_position.x, current_position.cost)
-        //fmt.Printf("Pos: %s | p %d\n", current_position_key, len(pending_positions))
+			//current_position_key := fmt.Sprintf("%v", current_position)
+			current_position_key := fmt.Sprintf("%s,%d,%d", current_position.direction, current_position.y, current_position.x)
+			if current_position.direction == "N" || current_position.direction == "S" {
+				current_position_key = fmt.Sprintf("V,%d,%d", current_position.y, current_position.x)
+			} else {
+				current_position_key = fmt.Sprintf("H,%d,%d", current_position.y, current_position.x)
+			}
+			//fmt.Printf("Pos: %s | p %d\n", current_position_key, len(pending_positions))
 
-		graph_nodes[current_position.y][current_position.x].isPending = false
-        pending_pos_map[current_position_key] = false
-		current_node := graph_nodes[current_position.y][current_position.x]
+			graph_nodes[current_position.y][current_position.x].isPending = false
+			pending_pos_map[current_position_key] = false
+			current_node := graph_nodes[current_position.y][current_position.x]
 
-        try_dirs, is_valid_dir := valid_dirs[current_position.direction]
-        if !is_valid_dir {
-            try_dirs = []string{"E", "S", "N", "W"}
-        }
-		for _, dir := range try_dirs {
-            //next_cost := current_node.lowest_cost
-            next_cost := current_position.cost
+			try_dirs, is_valid_dir := valid_dirs[current_position.direction]
+			if !is_valid_dir {
+				try_dirs = []string{"E", "S", "N", "W"}
+			}
+			for _, dir := range try_dirs {
+				//next_cost := current_node.lowest_cost
+				next_cost := current_position.cost
 
-			next_position := current_position
-            next_position.direction = dir
-			for i := 0; i < max_before_turn; i += 1 {
-				next_position = moveDirection(dir, next_position)
-                //fmt.Printf("Next: %v | p %d\n", next_position, len(pending_positions))
+				next_position := current_position
+				next_position.direction = dir
+				for i := 0; i < max_before_turn; i += 1 {
+					next_position = moveDirection(dir, next_position)
+					//fmt.Printf("Next: %v | p %d\n", next_position, len(pending_positions))
 
-				isPosRangeBad := next_position.y >= len(graph_nodes)
-				isPosRangeBad = isPosRangeBad || next_position.x >= len(graph_nodes[0])
-				isPosRangeBad = isPosRangeBad || next_position.y < 0
-				isPosRangeBad = isPosRangeBad || next_position.x < 0
-				isPosRangeBad = isPosRangeBad || next_position.direction == "0"
-				if isPosRangeBad {
-					// Out of range, it expires.
-					//fmt.Printf("[%d] Expire (invalid): %v\n", i, next_position)
-                    break
-				}
-
-                next_node := &graph_nodes[next_position.y][next_position.x]
-                //fmt.Printf("[%d] Cost: %d + %d = %d\n", i, next_cost, next_node.cost, next_cost + next_node.cost)
-                next_cost += next_node.cost
-				// If minimum distance before turning has been reached
-				if (i+1) >= min_before_turn {
-                    //fmt.Printf("Reached min\n")
-					next_position.cost = next_cost
-
-					if next_node.visited {
-                        //fmt.Printf("[%d] Expire (visited): %v\n", i, next_position)
-						continue
+					isPosRangeBad := next_position.y >= len(graph_nodes)
+					isPosRangeBad = isPosRangeBad || next_position.x >= len(graph_nodes[0])
+					isPosRangeBad = isPosRangeBad || next_position.y < 0
+					isPosRangeBad = isPosRangeBad || next_position.x < 0
+					isPosRangeBad = isPosRangeBad || next_position.direction == "0"
+					if isPosRangeBad {
+						// Out of range, it expires.
+						//fmt.Printf("[%d] Expire (invalid): %v\n", i, next_position)
+						break
 					}
 
-					if next_cost < next_node.lowest_cost {
-						next_node.lowest_cost = next_cost
-						if next_node.y == ending_node.y && next_node.x == ending_node.x {
-							next_node.lowest_cost_path = next_position.history
-                            fmt.Printf("[%d] Candidate: %d | %s", i, next_cost, next_position.history)
+					next_node := &graph_nodes[next_position.y][next_position.x]
+					//fmt.Printf("[%d] Cost: %d + %d = %d\n", i, next_cost, next_node.cost, next_cost + next_node.cost)
+					next_cost += next_node.cost
+					// If minimum distance before turning has been reached
+					if (i + 1) >= min_before_turn {
+						//fmt.Printf("Reached min\n")
+						next_position.cost = next_cost
+
+						if next_node.visited {
+							//fmt.Printf("[%d] Expire (visited): %v\n", i, next_position)
+							continue
 						}
-					} else {
-                        //fmt.Printf("[%d] Not cheaper: %d < %d %s %v\n", i, next_cost, next_node.lowest_cost, next_position.history, next_node)
-					}
 
-                    //next_node_key := fmt.Sprintf("%v", *&next_position)
-                    //next_node_key := fmt.Sprintf("%s,%d,%d,%d", next_position.direction, next_position.y, next_position.x, next_position.cost)
-                    next_node_key := fmt.Sprintf("%s,%d,%d", next_position.direction, next_position.y, next_position.x)
-                    //next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
-                    next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
-                    if !next_node_pending_found {
-                        next_node_pending = false
-                    }
-					if next_node.lowest_cost < math.MaxInt64 && !next_node_pending {
-                        //fmt.Printf("[%d] Appending next: %v\n", i, next_position)
-						pending_positions = append(pending_positions, next_position)
-                        pending_pos_map[next_node_key] = true
-					} else {
-                        //fmt.Printf("Not cheaper: %s %t %v\n", next_node_key, next_node_pending, *next_node)
-                    }
+						//next_node_key := fmt.Sprintf("%v", *&next_position)
+						//next_node_key := fmt.Sprintf("%s,%d,%d,%d", next_position.direction, next_position.y, next_position.x, next_position.cost)
+						var next_node_key string
+						if next_position.direction == "N" || next_position.direction == "S" {
+							next_node_key = fmt.Sprintf("V,%d,%d", next_position.y, next_position.x)
+						} else {
+							next_node_key = fmt.Sprintf("H,%d,%d", next_position.y, next_position.x)
+						}
+						//next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
+						next_node_pending, next_node_pending_found := pending_pos_map[next_node_key]
+						if !next_node_pending_found {
+							next_node_pending = false
+						}
+
+						var node_lowest_cost int
+						if next_position.direction == "N" || next_position.direction == "S" {
+							node_lowest_cost = next_node.lowest_cost_v
+						} else {
+							node_lowest_cost = next_node.lowest_cost_h
+						}
+						if next_cost < node_lowest_cost {
+							next_node.lowest_cost = next_cost
+							if next_position.direction == "N" || next_position.direction == "S" {
+								next_node.lowest_cost_v = next_cost
+							} else {
+								next_node.lowest_cost_h = next_cost
+							}
+
+                            if next_node_pending {
+                                // If pending, replace the position.
+                                for pos_i := 0; pos_i < len(pending_positions); pos_i += 1 {
+                                    candidate_pos := pending_positions[pos_i]
+                                    var candidate_pos_key string
+                                    if candidate_pos.direction == "N" || candidate_pos.direction == "S" {
+                                        candidate_pos_key = fmt.Sprintf("V,%d,%d", candidate_pos.y, candidate_pos.x)
+                                    } else {
+                                        candidate_pos_key = fmt.Sprintf("H,%d,%d", candidate_pos.y, candidate_pos.x)
+                                    }
+                                    if next_node_key == candidate_pos_key {
+                                        pending_positions[pos_i] = next_position
+                                    }
+                                }
+                            }
+
+							if next_node.y == ending_node.y && next_node.x == ending_node.x {
+								next_node.lowest_cost_path = next_position.history
+								if next_position.direction == "N" || next_position.direction == "S" {
+									next_node.lowest_cost_path_v = next_position.history
+								} else {
+									next_node.lowest_cost_path_h = next_position.history
+								}
+								fmt.Printf("[%d] Candidate: %d | %s\n", i, next_cost, next_position.history)
+							}
+						} else {
+							//fmt.Printf("[%d] Not cheaper: %d < %d %s %v\n", i, next_cost, next_node.lowest_cost, next_position.history, next_node)
+						}
+
+						if next_position.direction == "N" || next_position.direction == "S" {
+							if next_node.lowest_cost_v < math.MaxInt64 && !next_node_pending {
+								//fmt.Printf("[%d] Appending next: %v\n", i, next_position)
+								pending_positions = append(pending_positions, next_position)
+								pending_pos_map[next_node_key] = true
+							} else {
+								//fmt.Printf("Not cheaper: %s %t %v\n", next_node_key, next_node_pending, *next_node)
+							}
+						} else {
+							if next_node.lowest_cost_h < math.MaxInt64 && !next_node_pending {
+								//fmt.Printf("[%d] Appending next: %v\n", i, next_position)
+								pending_positions = append(pending_positions, next_position)
+								pending_pos_map[next_node_key] = true
+							} else {
+								//fmt.Printf("Not cheaper: %s %t %v\n", next_node_key, next_node_pending, *next_node)
+							}
+						}
+					}
+				}
+			}
+			graph_nodes[current_position.y][current_position.x].visited = true
+
+			if current_node.y == ending_node.y && current_node.x == ending_node.x {
+                current_node.lowest_cost = current_node.lowest_cost_v
+                current_node.lowest_cost_path = current_node.lowest_cost_path_v
+                if current_node.lowest_cost > current_node.lowest_cost_h {
+                    current_node.lowest_cost = current_node.lowest_cost_h
+                    current_node.lowest_cost_path = current_node.lowest_cost_path_h
+                }
+                graph_nodes[current_position.y][current_position.x] = current_node
+
+				fmt.Printf("Finished %v\n", current_node)
+				break
+			}
+
+			slices.SortFunc(pending_positions, func(a CruciblePosition, b CruciblePosition) int {
+				if a.cost == b.cost {
+					return 0
+				} else if a.cost < b.cost {
+					return -1
+				} else {
+					return 1
+				}
+			})
+			//if len(pending_positions) < 10 {
+			//    fmt.Fprintf(os.Stderr, "Pending: %v\n", pending_positions)
+			//} else {
+			//    fmt.Fprintf(os.Stderr, "Pending: %d %v\n", len(pending_positions), pending_positions[:2])
+			//}
+			if loop_num%10_000 == 0 {
+				if len(pending_positions) < 10 {
+					fmt.Printf("Pending: %v\n", pending_positions)
+				} else {
+					fmt.Printf("Pending: %d %v\n", len(pending_positions), pending_positions[:2])
 				}
 			}
 		}
-		graph_nodes[current_position.y][current_position.x].visited = true
 
-        if current_node.y == ending_node.y && current_node.x == ending_node.x {
-            fmt.Printf("Finished %v\n", current_node)
-            break
-        }
-
-		slices.SortFunc(pending_positions, func(a CruciblePosition, b CruciblePosition) int {
-			if a.cost == b.cost {
-				return 0 
-			} else if a.cost < b.cost {
-				return -1
-			} else {
-				return 1
+		for i_y, graph_line := range graph_nodes {
+			for i_x, graph_nde := range graph_line {
+				if graph_nde.lowest_cost < 10_000 {
+					fmt.Printf("%d:%4d | ", graph_nde.cost, graph_nde.lowest_cost)
+				} else {
+					fmt.Printf("%d:     | ", graph_nde.cost)
+				}
+				graph_nodes[i_y][i_x].visited = false
 			}
-		})
-        //if len(pending_positions) < 10 {
-        //    fmt.Fprintf(os.Stderr, "Pending: %v\n", pending_positions)
-        //} else {
-        //    fmt.Fprintf(os.Stderr, "Pending: %d %v\n", len(pending_positions), pending_positions[:2])
-        //}
-        if loop_num % 10_000 == 0 {
-            if len(pending_positions) < 10 {
-                fmt.Printf("Pending: %v\n", pending_positions)
-            } else {
-                fmt.Printf("Pending: %d %v\n", len(pending_positions), pending_positions[:2])
-            }
-        }
+			fmt.Printf("\n")
+		}
+
+		total = graph_nodes[ending_node.y][ending_node.x].lowest_cost
+		*visualise = graph_nodes[ending_node.y][ending_node.x].lowest_cost_path
+		first_total = total
+
+		fmt.Printf("T: p1 %d p2 %d \n", first_total, total)
 	}
 
-    for i_y,graph_line := range graph_nodes {
-        for i_x,graph_nde := range graph_line {
-            if graph_nde.lowest_cost < 10_000 {
-                fmt.Printf("%d:%4d | ", graph_nde.cost, graph_nde.lowest_cost)
-            } else {
-                fmt.Printf("%d:     | ", graph_nde.cost)
-            }
-            graph_nodes[i_y][i_x].visited = false
-        }
-        fmt.Printf("\n")
-    }
-
-    total = graph_nodes[ending_node.y][ending_node.x].lowest_cost
-    *visualise = graph_nodes[ending_node.y][ending_node.x].lowest_cost_path
-    first_total = total
-
-	fmt.Printf("T: p1 %d p2 %d \n", first_total, total)
+	if len(*visualise) > 0 {
+		vis_node := starting_node
+		vis_total := 0
+		for _, dir := range *visualise {
+			vis_node = moveDirection(string(dir), vis_node)
+			if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < len(graph_nodes) && vis_node.x < len(graph_nodes[0]) {
+				graph_nodes[vis_node.y][vis_node.x].visited = true
+				add_cost := graph_nodes[vis_node.y][vis_node.x].cost
+				fmt.Printf("CT: %4d + %4d = %4d\n", vis_total, add_cost, vis_total+add_cost)
+				vis_total += add_cost
+			} else {
+				fmt.Printf("ERROR: %v\n", vis_node)
+			}
+		}
 	}
 
-    if len(*visualise) > 0 {
-        vis_node := starting_node
-        vis_total := 0
-        for _,dir := range *visualise {
-            vis_node = moveDirection(string(dir), vis_node)
-            if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < len(graph_nodes) && vis_node.x < len(graph_nodes[0]) {
-                graph_nodes[vis_node.y][vis_node.x].visited = true
-                add_cost := graph_nodes[vis_node.y][vis_node.x].cost
-                fmt.Printf("CT: %4d + %4d = %4d\n", vis_total, add_cost,vis_total + add_cost)
-                vis_total += add_cost
-            } else {
-                fmt.Printf("ERROR: %v\n", vis_node)
-            }
-        }
-    }
-
-    for _,graph_line := range graph_nodes {
-        for _,graph_nde := range graph_line {
-            if graph_nde.visited {
-                fmt.Printf("%d", graph_nde.cost)
-            } else {
-                //fmt.Printf(" ")
-                fmt.Printf("\u001b[31m%d\u001b[0m", graph_nde.cost)
-            }
-        }
-        fmt.Printf("\n")
-    }
+	for _, graph_line := range graph_nodes {
+		for _, graph_nde := range graph_line {
+			if graph_nde.visited {
+				fmt.Printf("%d", graph_nde.cost)
+			} else {
+				//fmt.Printf(" ")
+				fmt.Printf("\u001b[31m%d\u001b[0m", graph_nde.cost)
+			}
+		}
+		fmt.Printf("\n")
+	}
 }

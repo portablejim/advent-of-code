@@ -35,11 +35,22 @@ type CruciblePosition struct {
 
 func generatePositionKey(current_position CruciblePosition) string {
     var current_position_key string
+    num_in_direction := 0
+    if len(current_position.history) > 0 {
+        for i := len(current_position.history)-1; i >= 0; i -= 1 {
+            if current_position.direction[0] == current_position.history[i] {
+                num_in_direction += 1
+            }
+        }
+    }
+    current_position_key = fmt.Sprintf("%s,%d,%d,%d", current_position.direction, num_in_direction, current_position.y, current_position.x)
+    /*
     if current_position.direction == "N" || current_position.direction == "S" {
         current_position_key = fmt.Sprintf("V,%d,%d", current_position.y, current_position.x)
     } else {
         current_position_key = fmt.Sprintf("H,%d,%d", current_position.y, current_position.x)
     }
+    */
     return current_position_key
 }
 

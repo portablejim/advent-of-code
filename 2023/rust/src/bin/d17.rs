@@ -1,4 +1,4 @@
-use std::{collections::BinaryHeap, fmt::{write, Display}, io::{self, BufRead}};
+use std::{collections::BinaryHeap, fmt::{write, Display}, io::{self, BufRead}, usize};
 
 
 #[derive(Debug,Clone, Copy,PartialEq, Eq, PartialOrd, Ord)]
@@ -63,9 +63,56 @@ struct GraphWeight {
     cost: i16,
     lowest_horizontal: GraphNodeLowest,
     lowest_vertical: GraphNodeLowest,
+    final_path: bool
 }
 
-fn cheapest_path(passed_weights: Vec<Vec<GraphWeight>>, min_before_turn: i32, max_before_turn: i32) -> Option<GraphState> {
+fn parse_answer(mut passed_weights: Vec<Vec<GraphWeight>>, finish_y: usize, finish_x: usize) -> (String, Vec<Vec<GraphWeight>>) {
+    let mut current_y = finish_y;
+    let mut current_x = finish_x;
+    let mut path = String::new();
+    let mut is_horizontal = if let finish_weight = passed_weights.get(current_y).unwrap().get(current_x).unwrap() {
+        finish_weight.lowest_horizontal.cost < finish_weight.lowest_vertical.cost
+    }
+    else {
+        false
+    };
+
+    passed_weights.get_mut(current_y).unwrap().get_mut(current_x).unwrap().final_path = true;
+
+    while current_y != 0 || current_x != 0 {
+        let current_weight_row = passed_weights.get(current_y).unwrap();
+        let current_weight = current_weight_row.get(current_x).unwrap();
+        let current_lowest = if is_horizontal {
+            current_weight.lowest_horizontal
+        } else {
+            current_weight.lowest_vertical
+        };
+        is_horizontal = !is_horizontal;
+
+        if let Some(current_lowest_prevdir) = current_lowest.prev_dir {
+            let (dx, dy, d_char, d_count) = match current_lowest_prevdir {
+                Direction::NORTH(c) => (0i16, 1i16, "N", c),
+                Direction::EAST(c) => (-1i16, 0i16, "E", c),
+                Direction::SOUTH(c) => (0i16, -1i16, "S", c),
+                Direction::WEST(c) => (1i16, 0i16, "W", c),
+            };
+
+            for i in 0..d_count {
+                current_x = usize::try_from(i16::try_from(current_x).unwrap() + dx).unwrap();
+                current_y = usize::try_from(i16::try_from(current_y).unwrap() + dy).unwrap();
+                passed_weights.get_mut(current_y).unwrap().get_mut(current_x).unwrap().final_path = true;
+                path = d_char.to_string() + path.as_str();
+            }
+        }
+        else {
+            break
+        }
+    }
+
+    return (path, passed_weights)
+}
+
+fn cheapest_path(passed_weights: Vec<Vec<GraphWeight>>, min_before_turn: i32, max_before_turn: i32) -> Option<(i16, String, Vec<Vec<GraphWeight>>)> {
     let mut weights = passed_weights.clone();
 
     let data_height = weights.len();
@@ -79,12 +126,8 @@ fn cheapest_path(passed_weights: Vec<Vec<GraphWeight>>, min_before_turn: i32, ma
 
     while let Some(current_state) = state_heap.pop() {
         if current_state.x == finish_x && current_state.y == finish_y {
-            for wl in weights {
-                for wc in wl {
-                    println!("{:?}", wc);
-                }
-            }
-            return Some(current_state);
+            let (path, final_weights) = parse_answer(weights, finish_y, finish_x);
+            return Some((current_state.lowest_cost, path, final_weights));
         }
 
         let current_weight_item: GraphWeight = if let Some(weight_item) = current_state.get_graph_item(weights.as_ref()) {
@@ -175,7 +218,7 @@ fn cheapest_path(passed_weights: Vec<Vec<GraphWeight>>, min_before_turn: i32, ma
         }
     }
 
-    println!("End:");
+    println!("End without solution:");
     for wl in weights {
         for wc in wl {
             println!("{:?}", wc);
@@ -211,6 +254,7 @@ fn main() {
                 cost: i16::from(char_byte - num_offset),
                 lowest_horizontal: if line_num == 0 && char_num == 0 { initial_initial } else { initial_lowest },
                 lowest_vertical: if line_num == 0 && char_num == 0 { initial_initial } else { initial_lowest },
+                final_path: false
             }
         })
         .collect()
@@ -219,9 +263,21 @@ fn main() {
 
     let final_cost = cheapest_path(weights, min_before_turn, max_before_turn);
 
-    if let Some(final_state) = final_cost {
-        let total = final_state.lowest_cost;
-        println!("Final score: {}", total)
+    if let Some((final_cost, path, final_weights)) = final_cost {
+        let total = final_cost;
+        println!("Final score: {}, {}", total, path);
+        for wl in final_weights {
+            for wc in wl {
+                if wc.final_path {
+                    print!("{}", wc.cost)
+                }
+                else {
+                    print!("\u{001b}[31m{}\u{001b}[0m", wc.cost)
+                }
+            }
+            print!("\n")
+        }
+
     } else {
         println!("No result")
     }

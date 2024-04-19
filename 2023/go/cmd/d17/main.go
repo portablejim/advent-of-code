@@ -11,8 +11,8 @@ import (
 )
 
 type GraphNode struct {
-	y                  int
-	x                  int
+	y                  int16
+	x                  int16
 	cost               int
 	visited_h          bool
 	visited_v          bool
@@ -29,18 +29,20 @@ type CruciblePosition struct {
 	direction   string
 	history     string
 	cost        int
-	y           int
-	x           int
+	y           int16
+	x           int16
 	is_starting bool
 }
 
-func generatePositionKey(current_position CruciblePosition) string {
-	var current_position_key string
+func generatePositionKey(current_position CruciblePosition) int64 {
+	var current_position_key = int64(1 << 33)
 	if current_position.direction == "N" || current_position.direction == "S" {
-		current_position_key = fmt.Sprintf("V,%d,%d", current_position.y, current_position.x)
-	} else {
-		current_position_key = fmt.Sprintf("H,%d,%d", current_position.y, current_position.x)
+		current_position_key = int64(2 << 33)
 	}
+
+	current_position_key += int64(current_position.y) << 16
+	current_position_key += int64(current_position.x)
+
 	return current_position_key
 }
 
@@ -81,7 +83,7 @@ func main() {
 		graph_node_row := []GraphNode{}
 		for c_num := 0; c_num < len(f_line); c_num += 1 {
 			node_weight := f_line[c_num] - '0'
-			graph_node_row = append(graph_node_row, GraphNode{l_num, c_num, int(node_weight), false, false, false, math.MaxInt64, "", math.MaxInt64, "", math.MaxInt64, ""})
+			graph_node_row = append(graph_node_row, GraphNode{int16(l_num), int16(c_num), int(node_weight), false, false, false, math.MaxInt64, "", math.MaxInt64, "", math.MaxInt64, ""})
 		}
 		graph_nodes = append(graph_nodes, graph_node_row)
 	}
@@ -97,7 +99,7 @@ func main() {
 	max_x := len(graph_nodes[0]) - 1
 
 	starting_node := CruciblePosition{"0", "", 0, 0, 0, true}
-	ending_node := CruciblePosition{"0", "", 0, max_y, max_x, false}
+	ending_node := CruciblePosition{"0", "", 0, int16(max_y), int16(max_x), false}
 
 	total := math.MaxInt64
 
@@ -111,7 +113,7 @@ func main() {
 	pending_positions := []CruciblePosition{}
 	pending_positions = append(pending_positions, starting_node)
 
-	pending_pos_map := map[string]bool{}
+	pending_pos_map := map[int64]bool{}
 
 	valid_dirs := map[string][]string{"N": {"E", "W"}, "S": {"E", "W"}, "E": {"N", "S"}, "W": {"N", "S"}}
 
@@ -153,8 +155,8 @@ func main() {
 				for i := 0; i < max_before_turn; i += 1 {
 					next_position = moveDirection(dir, next_position)
 
-					isPosRangeBad := next_position.y >= len(graph_nodes)
-					isPosRangeBad = isPosRangeBad || next_position.x >= len(graph_nodes[0])
+					isPosRangeBad := next_position.y >= int16(len(graph_nodes))
+					isPosRangeBad = isPosRangeBad || next_position.x >= int16(len(graph_nodes[0]))
 					isPosRangeBad = isPosRangeBad || next_position.y < 0
 					isPosRangeBad = isPosRangeBad || next_position.x < 0
 					isPosRangeBad = isPosRangeBad || next_position.direction == "0"
@@ -280,7 +282,7 @@ func main() {
 		vis_total := 0
 		for _, dir := range *visualise {
 			vis_node = moveDirection(string(dir), vis_node)
-			if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < len(graph_nodes) && vis_node.x < len(graph_nodes[0]) {
+			if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < int16(len(graph_nodes)) && vis_node.x < int16(len(graph_nodes[0])) {
 				graph_nodes[vis_node.y][vis_node.x].visited_v = true
 				if vis_node.direction == "N" || vis_node.direction == "S" {
 					graph_nodes[vis_node.y][vis_node.x].visited_v = true

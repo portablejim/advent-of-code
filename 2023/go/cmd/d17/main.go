@@ -14,7 +14,8 @@ type GraphNode struct {
 	y                  int
 	x                  int
 	cost               int
-	visited            bool
+	visited_h          bool
+	visited_v          bool
 	isPending          bool
 	lowest_cost        int
 	lowest_cost_path   string
@@ -80,7 +81,7 @@ func main() {
 		graph_node_row := []GraphNode{}
 		for c_num := 0; c_num < len(f_line); c_num += 1 {
 			node_weight := f_line[c_num] - '0'
-			graph_node_row = append(graph_node_row, GraphNode{l_num, c_num, int(node_weight), false, false, math.MaxInt64, "", math.MaxInt64, "", math.MaxInt64, ""})
+			graph_node_row = append(graph_node_row, GraphNode{l_num, c_num, int(node_weight), false, false, false, math.MaxInt64, "", math.MaxInt64, "", math.MaxInt64, ""})
 		}
 		graph_nodes = append(graph_nodes, graph_node_row)
 	}
@@ -136,6 +137,16 @@ func main() {
 			for _, dir := range try_dirs {
 				//next_cost := current_node.lowest_cost
 				next_cost := current_position.cost
+
+				if current_position.direction == "N" || current_position.direction == "S" {
+					if graph_nodes[current_position.y][current_position.x].visited_v {
+						continue
+					}
+				} else {
+					if graph_nodes[current_position.y][current_position.x].visited_h {
+						continue
+					}
+				}
 
 				next_position := current_position
 				next_position.direction = dir
@@ -215,7 +226,11 @@ func main() {
 					}
 				}
 			}
-			graph_nodes[current_position.y][current_position.x].visited = true
+			if current_position.direction == "N" || current_position.direction == "S" {
+				graph_nodes[current_position.y][current_position.x].visited_v = true
+			} else {
+				graph_nodes[current_position.y][current_position.x].visited_h = true
+			}
 
 			if current_node.y == ending_node.y && current_node.x == ending_node.x {
 				current_node.lowest_cost = current_node.lowest_cost_v
@@ -248,7 +263,8 @@ func main() {
 				} else {
 					fmt.Printf("%d:   |", graph_nde.cost)
 				}
-				graph_nodes[i_y][i_x].visited = false
+				graph_nodes[i_y][i_x].visited_v = false
+				graph_nodes[i_y][i_x].visited_h = false
 			}
 			fmt.Printf("\n")
 		}
@@ -265,7 +281,12 @@ func main() {
 		for _, dir := range *visualise {
 			vis_node = moveDirection(string(dir), vis_node)
 			if vis_node.x >= 0 && vis_node.y >= 0 && vis_node.y < len(graph_nodes) && vis_node.x < len(graph_nodes[0]) {
-				graph_nodes[vis_node.y][vis_node.x].visited = true
+				graph_nodes[vis_node.y][vis_node.x].visited_v = true
+				if vis_node.direction == "N" || vis_node.direction == "S" {
+					graph_nodes[vis_node.y][vis_node.x].visited_v = true
+				} else {
+					graph_nodes[vis_node.y][vis_node.x].visited_h = true
+				}
 				add_cost := graph_nodes[vis_node.y][vis_node.x].cost
 				fmt.Printf("CT: %4d + %4d = %4d\n", vis_total, add_cost, vis_total+add_cost)
 				vis_total += add_cost
@@ -277,7 +298,7 @@ func main() {
 
 	for _, graph_line := range graph_nodes {
 		for _, graph_nde := range graph_line {
-			if graph_nde.visited {
+			if graph_nde.visited_v || graph_nde.visited_h {
 				fmt.Printf("%d", graph_nde.cost)
 			} else {
 				//fmt.Printf(" ")

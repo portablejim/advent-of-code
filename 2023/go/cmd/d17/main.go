@@ -34,24 +34,13 @@ type CruciblePosition struct {
 }
 
 func generatePositionKey(current_position CruciblePosition) string {
-    var current_position_key string
-    num_in_direction := 0
-    if len(current_position.history) > 0 {
-        for i := len(current_position.history)-1; i >= 0; i -= 1 {
-            if current_position.direction[0] == current_position.history[i] {
-                num_in_direction += 1
-            }
-        }
-    }
-    current_position_key = fmt.Sprintf("%s,%d,%d,%d", current_position.direction, num_in_direction, current_position.y, current_position.x)
-    /*
-    if current_position.direction == "N" || current_position.direction == "S" {
-        current_position_key = fmt.Sprintf("V,%d,%d", current_position.y, current_position.x)
-    } else {
-        current_position_key = fmt.Sprintf("H,%d,%d", current_position.y, current_position.x)
-    }
-    */
-    return current_position_key
+	var current_position_key string
+	if current_position.direction == "N" || current_position.direction == "S" {
+		current_position_key = fmt.Sprintf("V,%d,%d", current_position.y, current_position.x)
+	} else {
+		current_position_key = fmt.Sprintf("H,%d,%d", current_position.y, current_position.x)
+	}
+	return current_position_key
 }
 
 func moveDirection(direction string, pos CruciblePosition) CruciblePosition {
@@ -137,7 +126,7 @@ func main() {
 			current_position_key := generatePositionKey(current_position)
 
 			graph_nodes[current_position.y][current_position.x].isPending = false
-			pending_pos_map[current_position_key] = false
+			delete(pending_pos_map, current_position_key)
 			current_node := graph_nodes[current_position.y][current_position.x]
 
 			try_dirs, is_valid_dir := valid_dirs[current_position.direction]
@@ -169,11 +158,7 @@ func main() {
 					if (i + 1) >= min_before_turn {
 						next_position.cost = next_cost
 
-						if next_node.visited {
-							continue
-						}
-
-                        next_position_key := generatePositionKey(next_position)
+						next_position_key := generatePositionKey(next_position)
 						next_node_pending, next_node_pending_found := pending_pos_map[next_position_key]
 						if !next_node_pending_found {
 							next_node_pending = false
@@ -193,16 +178,17 @@ func main() {
 								next_node.lowest_cost_h = next_cost
 							}
 
-                            if next_node_pending {
-                                // If pending, replace the position.
-                                for pos_i := 0; pos_i < len(pending_positions); pos_i += 1 {
-                                    candidate_pos := pending_positions[pos_i]
-                                    candidate_pos_key := generatePositionKey(candidate_pos)
-                                    if next_position_key == candidate_pos_key {
-                                        pending_positions[pos_i] = next_position
-                                    }
-                                }
-                            }
+							if next_node_pending {
+								// If pending, replace the position.
+								for pos_i := 0; pos_i < len(pending_positions); pos_i += 1 {
+									candidate_pos := pending_positions[pos_i]
+									candidate_pos_key := generatePositionKey(candidate_pos)
+									if next_position_key == candidate_pos_key {
+										pending_positions[pos_i] = next_position
+										break
+									}
+								}
+							}
 
 							if next_node.y == ending_node.y && next_node.x == ending_node.x {
 								next_node.lowest_cost_path = next_position.history
@@ -232,13 +218,13 @@ func main() {
 			graph_nodes[current_position.y][current_position.x].visited = true
 
 			if current_node.y == ending_node.y && current_node.x == ending_node.x {
-                current_node.lowest_cost = current_node.lowest_cost_v
-                current_node.lowest_cost_path = current_node.lowest_cost_path_v
-                if current_node.lowest_cost > current_node.lowest_cost_h {
-                    current_node.lowest_cost = current_node.lowest_cost_h
-                    current_node.lowest_cost_path = current_node.lowest_cost_path_h
-                }
-                graph_nodes[current_position.y][current_position.x] = current_node
+				current_node.lowest_cost = current_node.lowest_cost_v
+				current_node.lowest_cost_path = current_node.lowest_cost_path_v
+				if current_node.lowest_cost > current_node.lowest_cost_h {
+					current_node.lowest_cost = current_node.lowest_cost_h
+					current_node.lowest_cost_path = current_node.lowest_cost_path_h
+				}
+				graph_nodes[current_position.y][current_position.x] = current_node
 
 				fmt.Printf("Finished %v\n", current_node)
 				break

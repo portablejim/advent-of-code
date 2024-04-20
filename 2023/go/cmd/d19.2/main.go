@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -23,6 +24,7 @@ type Rule struct {
     cond_s Range
     action_type string
     action_data string
+    ignore_mask int8
 }
 
 func (r Rule) partMatches(p Part) bool {
@@ -71,15 +73,18 @@ func appendArrayUnique(tgt_array []int64, tgt_val int64) []int64 {
     return tgt_array
 }
 
-func evaluateWorkflow(workflow_map map[string]Workflow, current_part *Part, workflow_name string) string {
-    fmt.Printf("Workflow %s | part %v\n", workflow_name, *current_part)
+func evaluateWorkflow(workflow_map map[string]Workflow, current_part *Part, workflow_name string, ignore_mask int8) string {
     current_workflow := workflow_map[workflow_name]
     for _,cur_rule := range current_workflow.rules {
+        if ignore_mask & cur_rule.ignore_mask > 0 {
+            continue
+        }
         if cur_rule.partMatches(*current_part) {
+            //fmt.Printf("Part matches: %v %v\n", *current_part, cur_rule)
             if cur_rule.action_type == "accept" || cur_rule.action_type == "reject" {
                 return cur_rule.action_type
             } else if cur_rule.action_type == "chain" {
-                return evaluateWorkflow(workflow_map, current_part, cur_rule.action_data)
+                return evaluateWorkflow(workflow_map, current_part, cur_rule.action_data, ignore_mask)
             } else {
                 fmt.Printf("Unknown action type %s\n", cur_rule.action_type)
                 return "unknown"
@@ -109,10 +114,10 @@ func main() {
 
     workflow_map := map[string]Workflow{}
 
-    range_x := []int64
-    range_m := []int64
-    range_a := []int64
-    range_s := []int64
+    ranges_x := []int64{1, 4001}
+    ranges_m := []int64{1, 4001}
+    ranges_a := []int64{1, 4001}
+    ranges_s := []int64{1, 4001}
 
     default_range := Range{math.MinInt64, math.MaxInt64}
     for _,wf_lne := range strings.Split(workflow_strs, "\n") {
@@ -123,21 +128,38 @@ func main() {
         }
         target_workflow := Workflow{wf_lb, []Rule{}}
         for _,wf_rule_raw := range strings.Split(strings.Trim(wf_data_raw[:len(wf_data_raw)-1], " "), ",") {
-            target_rule := Rule{default_range, default_range, default_range, default_range, "", ""}
+            target_rule := Rule{default_range, default_range, default_range, default_range, "", "", 0}
             if p_range_rule.MatchString(wf_rule_raw) {
                 wf_parts := p_range_rule.FindStringSubmatch(wf_rule_raw)
 
+                var cutoff_val int64
                 if wf_parts[1] == "x" {
+                    target_rule.ignore_mask = 8
                     target_rule.cond_x, cutoff_val = createRange(wf_parts[2], wf_parts[3])
+                    //ranges_x = appendArrayUnique(ranges_x, cutoff_val-1)
+                    ranges_x = appendArrayUnique(ranges_x, cutoff_val)
+                    //ranges_x = appendArrayUnique(ranges_x, cutoff_val+1)
                 }
                 if wf_parts[1] == "m" {
-                    target_rule.cond_m = createRange(wf_parts[2], wf_parts[3])
+                    target_rule.ignore_mask = 4
+                    target_rule.cond_m, cutoff_val = createRange(wf_parts[2], wf_parts[3])
+                    //ranges_m = appendArrayUnique(ranges_m, cutoff_val-1)
+                    ranges_m = appendArrayUnique(ranges_m, cutoff_val)
+                    //ranges_m = appendArrayUnique(ranges_m, cutoff_val+1)
                 }
                 if wf_parts[1] == "a" {
-                    target_rule.cond_a = createRange(wf_parts[2], wf_parts[3])
+                    target_rule.ignore_mask = 2
+                    target_rule.cond_a, cutoff_val = createRange(wf_parts[2], wf_parts[3])
+                    //ranges_a = appendArrayUnique(ranges_a, cutoff_val-1)
+                    ranges_a = appendArrayUnique(ranges_a, cutoff_val)
+                    //ranges_a = appendArrayUnique(ranges_a, cutoff_val+1)
                 }
                 if wf_parts[1] == "s" {
-                    target_rule.cond_s = createRange(wf_parts[2], wf_parts[3])
+                    target_rule.ignore_mask = 1
+                    target_rule.cond_s, cutoff_val = createRange(wf_parts[2], wf_parts[3])
+                    //ranges_s = appendArrayUnique(ranges_s, cutoff_val -1)
+                    ranges_s = appendArrayUnique(ranges_s, cutoff_val)
+                    //ranges_s = appendArrayUnique(ranges_s, cutoff_val + 1)
                 }
 
                 if wf_parts[4] == "A" {
@@ -148,7 +170,6 @@ func main() {
                     target_rule.action_type = "chain"
                     target_rule.action_data = wf_parts[4]
                 }
-                fmt.Printf("WFR: %v %v | %v\n", wf_lb, wf_parts, target_rule)
             } else {
                 if wf_rule_raw == "A" {
 
@@ -161,7 +182,6 @@ func main() {
                     target_rule.action_type = "chain"
                     target_rule.action_data = wf_rule_raw
                 }
-                fmt.Printf("WFO: %v %v\n", wf_lb, target_rule)
             }
             target_workflow.rules = append(target_workflow.rules, target_rule)
         }
@@ -180,14 +200,13 @@ func main() {
         if val_x_err != nil || val_m_err != nil || val_a_err != nil || val_s_err != nil {
             continue
         }
-        fmt.Printf("Part: %v\n", part_arr)
         part_list = append(part_list, Part{val_x, val_m, val_a, val_s})
     }
 
 	total := 0
 
     for cp_i,current_part := range part_list {
-        eval_result := evaluateWorkflow(workflow_map, &current_part, "in")
+        eval_result := evaluateWorkflow(workflow_map, &current_part, "in", 0)
         part_total := 0
         if eval_result == "accept" {
             part_total = int(current_part.x) + int(current_part.m) + int(current_part.a) + int(current_part.s)
@@ -196,8 +215,50 @@ func main() {
         fmt.Printf("Current part %d: %s | %d %d\n", cp_i, eval_result, part_total, total)
     }
 
+    slices.Sort(ranges_x)
+    slices.Sort(ranges_m)
+    slices.Sort(ranges_a)
+    slices.Sort(ranges_s)
+
+    fmt.Printf("Ranges x: %v\n", ranges_x)
+    fmt.Printf("Ranges m: %v\n", ranges_m)
+    fmt.Printf("Ranges a: %v\n", ranges_a)
+    fmt.Printf("Ranges s: %v\n", ranges_s)
+
+    range_other := int64(0)
+
+    for i_x := 0; i_x < len(ranges_x)-1; i_x += 1 {
+        r_start_x := ranges_x[i_x]
+        r_end_x := ranges_x[i_x+1]
+        r_range_x := r_end_x - r_start_x
+        fmt.Printf("X %d / %d\n", i_x, len(ranges_x)-1)
+
+        for i_m := 0; i_m < len(ranges_m)-1; i_m += 1 {
+            r_start_m := ranges_m[i_m]
+            r_end_m := ranges_m[i_m+1]
+            r_range_m := r_end_m - r_start_m
+
+            for i_a := 0; i_a < len(ranges_a)-1; i_a += 1 {
+                r_start_a := ranges_a[i_a]
+                r_end_a := ranges_a[i_a+1]
+                r_range_a := r_end_a - r_start_a
+
+                for i_s := 0; i_s < len(ranges_s)-1; i_s += 1 {
+                    r_start_s := ranges_s[i_s]
+                    r_end_s := ranges_s[i_s+1]
+                    r_range_s := r_end_s - r_start_s
+
+                    eval_result := evaluateWorkflow(workflow_map, &Part{r_start_x, r_start_m, r_start_a, r_start_s}, "in", 0)
+                    if eval_result == "accept" {
+                        range_other += r_range_x * r_range_m * r_range_a * r_range_s
+                        //fmt.Printf("Rng O: %d * %d (%d - %d) * %d * %d\n", r_range_x, r_range_m, r_start_m, r_end_m, r_range_a, r_range_m)
+                    }
+                }
+            }
+        }
+    }
 
 	//fmt.Printf("numbers list 1: %v\n", numbers_list)
 	//fmt.Printf("numbers map: %v\n", numbers_map)
-	fmt.Printf("T: %d\n", total)
+	fmt.Printf("T: pt1 %d pt2 %d \n", total, range_other)
 }

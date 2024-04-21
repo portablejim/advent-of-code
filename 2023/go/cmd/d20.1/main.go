@@ -50,9 +50,13 @@ func splitCommaSepNums(num_list_str string) []int {
 	return output
 }
 
-func handleButtonPush(moduleMap map[string]Module) (map[string]Module, int, int) {
+func handleButtonPush(moduleMap map[string]Module) (map[string]Module, int, int, bool, bool, bool, bool) {
     countHigh := 0
     countLow := 0
+    jtTriggered := false
+    sxTriggered := false
+    kbTriggered := false
+    ksTriggered := false
 
     pulseQueue := []Pulse{{false, "broadcaster", "button"}}
 
@@ -60,18 +64,35 @@ func handleButtonPush(moduleMap map[string]Module) (map[string]Module, int, int)
         currentPulse := pulseQueue[0]
         pulseQueue = pulseQueue[1:]
 
-        //pulseLevelStr := "L"
+        pulseLevelStr := "L"
         if currentPulse.isHigh {
             countHigh += 1
-            //pulseLevelStr = "H"
+            pulseLevelStr = "H"
         } else {
             countLow += 1
         }
 
-
         currentModule, currentModuleExists := moduleMap[currentPulse.target]
+
+        if currentModule.moduleName == "jt" && !currentPulse.isHigh {
+            fmt.Printf("JT Triggered")
+            jtTriggered = true
+        }
+        if currentModule.moduleName == "sx" && !currentPulse.isHigh {
+            fmt.Printf("SX Triggered")
+            sxTriggered = true
+        }
+        if currentModule.moduleName == "kb" && !currentPulse.isHigh {
+            kbTriggered = true
+        }
+        if currentModule.moduleName == "ks" && !currentPulse.isHigh {
+            ksTriggered = true
+        }
+
         if !currentModuleExists {
-            //fmt.Printf("P I: (from %s) %s -%s-> ?!?!\n", currentPulse.source, currentPulse.target, pulseLevelStr)
+            if false {
+                fmt.Printf("P I: (from %s) %s -%s-> ?!?!\n", currentPulse.source, currentPulse.target, pulseLevelStr)
+            }
             continue
         }
         //fmt.Printf("P I: %s -%s-> %s %v\n", currentPulse.source, pulseLevelStr, currentPulse.target, currentModule.targetModules)
@@ -121,11 +142,12 @@ func handleButtonPush(moduleMap map[string]Module) (map[string]Module, int, int)
         }
     }
 
-    return moduleMap, countHigh, countLow
+    return moduleMap, countHigh, countLow, jtTriggered, sxTriggered, kbTriggered, ksTriggered
 }
 
 func main() {
     var filename = flag.String("f", "../inputs/d20.sample1.txt", "file to use")
+    var part2 = flag.Bool("part2", false, "output part 2")
     flag.Parse()
     dat, err := os.ReadFile(*filename)
     if err != nil {
@@ -177,7 +199,12 @@ func main() {
 
     loopSize := -1
 
-    pressCount := 1_000
+    jtButtonPressI := -1
+    sxButtonPressI := -1
+    kbButtonPressI := -1
+    ksButtonPressI := -1
+
+    pressCount := 10_000
     for i := 0; i < pressCount; i += 1 {
         //fmt.Printf("I: %d %v\n", i, currentState)
         currentStateData, currentStateInMap := stateMap[currentState]
@@ -203,7 +230,19 @@ func main() {
 
 
         } else {
-            _, pushHighCount, pushLowCount := handleButtonPush(moduleMap)
+            _, pushHighCount, pushLowCount, hasJtTriggered, hasSxTriggered, hasKsTriggered, hasKbTriggered := handleButtonPush(moduleMap)
+            if hasJtTriggered && jtButtonPressI < 0 {
+                jtButtonPressI = i+1 // 1 based indexing
+            }
+            if hasKsTriggered && ksButtonPressI < 0 {
+                ksButtonPressI = i+1 // 1 based indexing
+            }
+            if hasSxTriggered && sxButtonPressI < 0 {
+                sxButtonPressI = i+1 // 1 based indexing
+            }
+            if hasKbTriggered && kbButtonPressI < 0 {
+                kbButtonPressI = i+1 // 1 based indexing
+            }
 
             totalHigh += pushHighCount
             totalLow += pushLowCount
@@ -219,7 +258,7 @@ func main() {
 
             nextStateData, nextStateInMap := stateMap[nextState]
             if !nextStateInMap {
-                fmt.Printf("Current state not in map\n")
+                //fmt.Printf("Current state not in map\n")
                 nextStateData = StateData{"", i+1, pushHighCount, pushLowCount, totalHigh, totalLow}
                 stateMap[nextState] = nextStateData
             }
@@ -233,5 +272,19 @@ func main() {
 
     //fmt.Printf("node_list: %v\n", node_list)
     fmt.Printf("T: %d %d %d\n", totalHigh, totalLow, total)
+    if *part2 {
+        fmt.Printf("Part2: %d,%d,%d,%d", jtButtonPressI, sxButtonPressI, ksButtonPressI, kbButtonPressI)
+    }
+
+    /*
+    for nl,nd := range moduleMap {
+        //fmt.Printf("%s%s", nd.typeName, nl)
+        for _,cName := range nd.targetModules {
+            cMod := moduleMap[cName]
+            fmt.Printf("%s%s -> %s%s\n", nd.typeName, nl, cMod.typeName, cMod.moduleName)
+        }
+        fmt.Printf("\n")
+    }
+    */
 }
 

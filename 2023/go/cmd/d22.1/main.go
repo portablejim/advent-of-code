@@ -80,23 +80,143 @@ func main() {
 
 	lastLayer := 1
 
-	for currentLayerNum := stackHeightList[1]; currentLayerNum < len(stackHeightList); currentLayerNum += 1 {
+	sort.Ints(stackHeightList)
+
+	// Do gravity.
+	for currentLayerNum := stackHeightList[0]; currentLayerNum < len(stackHeightList); currentLayerNum += 1 {
 		currentLayer := stackHeightList[currentLayerNum]
 		currentLayerIndexes := stackMap[currentLayer]
+		fmt.Printf("Handling layer %d (%d) | %v | %d\n", currentLayer, currentLayerNum, currentLayerIndexes, lastLayer)
 		for _, currentLayerIndex := range currentLayerIndexes {
 			currentBrick := brickList[currentLayerIndex]
-			brickHeight := currentBrick.posEnd.z - currentBrick.posStart.z
+			//brickHeight := currentBrick.posEnd.z - currentBrick.posStart.z
 
-			fmt.Printf("%d, %v\n", lastLayer, brickHeight)
+			fmt.Printf("    Current brick: %v\n", currentBrick)
+			//fmt.Printf("%d, %v\n", lastLayer, brickHeight)
+
+			testBrick := currentBrick
+			for testBrick.posStart.z > 1 {
+				testBrick.posStart.z -= 1
+				testBrick.posEnd.z -= 1
+
+				hasIntersection := false
+				testLayerIndexes := stackMap[testBrick.posStart.z]
+				//fmt.Printf("        Test brick: %v | vs %v | %v\n", testBrick, testLayerIndexes, stackMap)
+				for _, comparsionBrickIndex := range testLayerIndexes {
+					comparisonBrick := brickList[comparsionBrickIndex]
+					//fmt.Printf("            comparison brick: %v\n", comparisonBrick)
+					for testX := testBrick.posStart.x; testX <= testBrick.posEnd.x; testX += 1 {
+						for testY := testBrick.posStart.y; testY <= testBrick.posEnd.y; testY += 1 {
+							intersectsX := comparisonBrick.posStart.x <= testX && comparisonBrick.posEnd.x >= testX
+							intersectsY := comparisonBrick.posStart.y <= testY && comparisonBrick.posEnd.y >= testY
+							intersectsZ := comparisonBrick.posStart.z <= testBrick.posStart.z && comparisonBrick.posEnd.z >= testBrick.posStart.z
+							if intersectsX && intersectsY && intersectsZ {
+								//fmt.Printf("             %d %d %d intersects | %t %t %t\n", testX, testY, testBrick.posStart.z, intersectsX, intersectsY, intersectsZ)
+								hasIntersection = true
+								break
+							} else {
+								//fmt.Printf("             %d %d %d not intersect | %t %t %t\n", testX, testY, testBrick.posStart.z, intersectsX, intersectsY, intersectsZ)
+							}
+						}
+						if hasIntersection {
+							break
+						}
+					}
+					if hasIntersection {
+						break
+					}
+				}
+
+				if hasIntersection {
+					testBrick.posStart.z += 1
+					testBrick.posEnd.z += 1
+					//fmt.Printf("Test brick end with intersection: %v\n", testBrick)
+					break
+				}
+			}
+			newBrick := testBrick
+			//fmt.Printf("New brick: %v\n", newBrick)
+			for oldLayerIndex := currentBrick.posStart.z; oldLayerIndex <= currentBrick.posEnd.z; oldLayerIndex += 1 {
+				newStackHeightItems := []int{}
+				for _, oldStackHeightItem := range stackMap[oldLayerIndex] {
+					if oldStackHeightItem != currentBrick.num {
+						newStackHeightItems = append(newStackHeightItems, oldStackHeightItem)
+					}
+				}
+				stackMap[oldLayerIndex] = newStackHeightItems
+			}
+			for newLayerIndex := newBrick.posStart.z; newLayerIndex <= newBrick.posEnd.z; newLayerIndex += 1 {
+				//fmt.Printf("New brick layer: %d\n", newLayerIndex)
+				newStackMap, stackMapFound := stackMap[newLayerIndex]
+				if !stackMapFound {
+					newStackMap = []int{}
+					stackHeightList = append(stackHeightList, newLayerIndex)
+					sort.Ints(stackHeightList)
+				}
+				newStackMap = append(newStackMap, newBrick.num)
+				stackMap[newLayerIndex] = newStackMap
+			}
+			brickList[newBrick.num] = newBrick
 		}
 	}
 
 	sort.Ints(stackHeightList)
 
+	total := 0
+
+	for _, currentBrick := range brickList {
+		aboveBricksSupported := true
+		for _, aboveBrickIndex := range stackMap[currentBrick.posEnd.z+1] {
+			aboveBrick := brickList[aboveBrickIndex]
+			if aboveBrick.posStart.z < (currentBrick.posEnd.z + 1) {
+				// Can't be resting on the current brick
+				continue
+			}
+
+			isSupported := false
+
+			// Test all below bricks to see if supported by other bricks
+			aboveBrickTest := aboveBrick
+			aboveBrickTest.posStart.z -= 1
+			aboveBrickTest.posEnd.z -= 1
+			for _, candidateSupportingIndex := range stackMap[currentBrick.posEnd.z] {
+				if candidateSupportingIndex == currentBrick.num {
+					// Don't test against this brick
+					continue
+				}
+				candidateSupporting := brickList[candidateSupportingIndex]
+				for testX := aboveBrickTest.posStart.x; testX <= aboveBrickTest.posEnd.x; testX += 1 {
+					for testY := aboveBrickTest.posStart.y; testY <= aboveBrickTest.posEnd.y; testY += 1 {
+						intersectsX := candidateSupporting.posStart.x <= testX && candidateSupporting.posEnd.x >= testX
+						intersectsY := candidateSupporting.posStart.y <= testY && candidateSupporting.posEnd.y >= testY
+						intersectsZ := candidateSupporting.posStart.z <= aboveBrickTest.posStart.z && candidateSupporting.posEnd.z >= aboveBrickTest.posStart.z
+						if intersectsX && intersectsY && intersectsZ {
+							//fmt.Printf("             %d %d %d intersects | %t %t %t\n", testX, testY, testBrick.posStart.z, intersectsX, intersectsY, intersectsZ)
+							isSupported = true
+							break
+						} else {
+							//fmt.Printf("             %d %d %d not intersect | %t %t %t\n", testX, testY, testBrick.posStart.z, intersectsX, intersectsY, intersectsZ)
+						}
+					}
+					if isSupported {
+						break
+					}
+				}
+			}
+			if !isSupported {
+				aboveBricksSupported = false
+			}
+		}
+
+		if aboveBricksSupported {
+			total += 1
+		}
+
+	}
+
 	fmt.Printf("Layers: %v\n", stackHeightList)
 	fmt.Printf("Layer map: %v\n", stackMap)
-
-	total := 0
+	fmt.Printf("Bricklist: %v\n", brickList)
 
 	//fmt.Printf("numbers list 1: %v\n", numbers_list)
 	//fmt.Printf("numbers map: %v\n", numbers_map)

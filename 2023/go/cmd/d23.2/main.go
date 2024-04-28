@@ -54,7 +54,7 @@ type MapTile struct {
 	visited            bool
 	highest_steps      int
 	highest_steps_path []Point
-	isNode             bool
+	nodeIndex          int
 }
 
 type GraphEdge struct {
@@ -66,8 +66,10 @@ type GraphEdge struct {
 }
 
 type GraphNode struct {
-	pos   Point
-	edges []GraphEdge
+	pos              Point
+	edges            []GraphEdge
+	highestSteps     int
+	highestStepsPath []Point
 }
 
 type GraphNodeDiscovery struct {
@@ -76,9 +78,10 @@ type GraphNodeDiscovery struct {
 }
 
 type PendingWalk struct {
-	pos     Point
-	steps   int
-	history []Point
+	pos          Point
+	steps        int
+	history      []Point
+	historyNodes []int
 }
 
 type LongestWalk []PendingWalk
@@ -122,7 +125,7 @@ func moveDirection(direction string, currentPos PendingWalk) PendingWalk {
 	nextHistory = append(nextHistory, currentPos.history...)
 	nextHistory = append(nextHistory, nextPos)
 	//fmt.Printf("MoveDir %s | %v | %v\n", direction, currentPos.history, nextHistory)
-	return PendingWalk{nextPos, currentPos.steps + 1, nextHistory}
+	return PendingWalk{nextPos, currentPos.steps + 1, nextHistory, currentPos.historyNodes}
 }
 
 func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode GraphNode, ignoreTiles bool) []GraphNode {
@@ -141,7 +144,7 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 		currentNode := currentNodeDiscovery.node
 		pendingNodes = pendingNodes[1:]
 
-		fmt.Printf("Node %d,%d from %s\n", currentNode.pos.y, currentNode.pos.x, currentNodeDiscovery.direction)
+		//fmt.Printf("Node %d,%d from %s\n", currentNode.pos.y, currentNode.pos.x, currentNodeDiscovery.direction)
 
 	initDirLoop:
 		for _, initDir := range allDirs {
@@ -157,16 +160,14 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 			}
 
 			for nextPosNotNode {
-				fmt.Printf("Next pos: %d,%d | %s | %s\n", nextPos.y, nextPos.x, nextDir, currentNodeDiscovery.direction)
+				//fmt.Printf("Next pos: %d,%d | %s | %s\n", nextPos.y, nextPos.x, nextDir, currentNodeDiscovery.direction)
 
 				if nextPos.isInvalid(mapTiles2d) {
-					fmt.Printf("Invalid\n")
 					continue initDirLoop
 				}
 
 				if inverseDirs[currentNodeDiscovery.direction] == nextDir {
 					// Can't go back
-					fmt.Printf("Back %s\n", inverseDirs[currentNodeDiscovery.direction])
 					//continue initDirLoop
 				}
 
@@ -174,7 +175,6 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 
 				if !nextTile.isPath {
 					// Can't go to a non-path.
-					fmt.Printf("Non-path %v %v\n", nextPos, nextTile)
 					continue initDirLoop
 				}
 
@@ -203,8 +203,6 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 					if !candidateTile.isPath {
 						continue
 					}
-
-					fmt.Printf("Appending valid dirs: np %v cp %v ct %v nextdir %s from %s\n", nextPos, candidatePos, candidateTile, nextTestDir, nextDir)
 					nextValidDirs = append(nextValidDirs, nextTestDir)
 				}
 
@@ -214,9 +212,7 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 					nextSteps += 1
 					nextPos = nextPos.move(nextValidDirs[0], 1)
 					nextDir = nextValidDirs[0]
-					fmt.Printf("nextpos %v nextDir %v | cands %v\n", nextPos, nextDir, nextValidDirs)
 				} else if numCandidateDirs == 2 || numCandidateDirs == 3 || (numCandidateDirs == 0 && nextPos.y == endingNode.pos.y && nextPos.x == endingNode.pos.x) {
-					fmt.Printf("Node nextvaliddirs: %v | %v\n", nextPos, nextValidDirs)
 					// Found a node
 					nextNodeNum := -1
 					currentNodeNum := -1
@@ -242,7 +238,6 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 								// Add edge back for revese direction.
 								foundNodes[nextNodeNum].edges = append(foundNodes[nextNodeNum].edges, nextNodeEdge)
 							}
-							fmt.Printf("Connecting to existing node %d at %d,%d\n", nextNodeNum, foundNodes[nextNodeNum].pos.y, foundNodes[nextNodeNum].pos.x)
 
 						} else {
 							nextNodeNum = len(foundNodes)
@@ -252,10 +247,9 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 								// If one way, there is no reverse edge to come back.
 								nextNodeEdges = []GraphEdge{}
 							}
-							nextNodeDis := GraphNodeDiscovery{GraphNode{nextPos, nextNodeEdges}, nextDir}
+							nextNodeDis := GraphNodeDiscovery{GraphNode{nextPos, nextNodeEdges, -1, []Point{}}, nextDir}
 							foundNodes = append(foundNodes, nextNodeDis.node)
 							pendingNodes = append(pendingNodes, nextNodeDis)
-							fmt.Printf("Adding node at %d,%d (%d)\n", nextPos.y, nextPos.x, len(foundNodes))
 						}
 
 						// Add edge to next node
@@ -272,7 +266,6 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 					}
 					nextPosNotNode = false
 				} else {
-					fmt.Printf("Bad nextvaliddirs: %v | %v\n", nextPos, nextValidDirs)
 					break
 				}
 			}
@@ -281,8 +274,8 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 	}
 
 	fmt.Printf("Total found: %d\n", len(foundNodes))
-	for _, foundN := range foundNodes {
-		fmt.Printf("@ %d,%d | ", foundN.pos.y, foundN.pos.x)
+	for foundI, foundN := range foundNodes {
+		fmt.Printf("%d @ %d,%d | ", foundI, foundN.pos.y, foundN.pos.x)
 		for _, foundE := range foundN.edges {
 			fmt.Printf(" (%s %d %v)", foundE.direction, foundE.weight, foundE.connectionPoint)
 		}
@@ -330,27 +323,77 @@ func printVisitedGraph(mapTiles2d [][]MapTile, visitedPoints []Point) {
 func stepsStringify(steps []Point) string {
 	output := ""
 	for _, step := range steps {
-		output += fmt.Sprintf(";%d,%d", step.y, step.x)
+		output += fmt.Sprintf("|%d,%d", step.y, step.x)
 	}
-	return output
+    return output[1:]
 }
 
 func stepsParse(stepsStr string) []Point {
-    output := []Point{}
+	output := []Point{}
 
-    for _,stepStr := range strings.Split(stepsStr, ";") {
-        stepSplit := strings.Split(stepStr, ",")
-        if len(stepSplit) == 2 {
-            stepY, stepYParsed := strconv.ParseInt(stepSplit[1], 10, 16)
-            stepX, stepXParsed := strconv.ParseInt(stepSplit[0], 10, 16)
+	for _, stepStr := range strings.Split(stepsStr, "|") {
+		stepSplit := strings.Split(stepStr, ",")
+		if len(stepSplit) == 2 {
+			stepY, stepYParsed := strconv.ParseInt(stepSplit[1], 10, 16)
+			stepX, stepXParsed := strconv.ParseInt(stepSplit[0], 10, 16)
 
-            if stepYParsed != nil && stepXParsed != nil {
-                output = append(output, Point{int16(stepY), int16(stepX)})
-            }
-        }
-    }
+			if stepYParsed != nil && stepXParsed != nil {
+				output = append(output, Point{int16(stepY), int16(stepX)})
+			}
+		}
+	}
 
-    return output
+	return output
+}
+
+func countNodesManually(mapTiles2d [][]MapTile) {
+	numNodes2 := 0
+	numNodes3 := 0
+	for _, graphLine := range mapTiles2d {
+		for _, graphColumn := range graphLine {
+			dirs := []string{"U", "R", "D", "L"}
+			countPaths := 0
+			if !graphColumn.isPath {
+				continue
+			}
+			for _, dir := range dirs {
+				testPos := graphColumn.pos.move(dir, 1)
+				if testPos.x < 0 || testPos.y < 0 || int(testPos.x) >= len(graphLine) || int(testPos.y) >= len(mapTiles2d) {
+					continue
+				}
+				testItem := mapTiles2d[testPos.y][testPos.x]
+				if testItem.isPath {
+					countPaths += 1
+				}
+			}
+			if countPaths > 2 {
+				fmt.Printf("%d,%d: %d\n", graphColumn.pos.y, graphColumn.pos.x, countPaths)
+				mapTiles2d[graphColumn.pos.y][graphColumn.pos.x].nodeIndex = numNodes2
+				numNodes2 += 1
+			}
+			if countPaths > 3 {
+				numNodes3 += 1
+			}
+		}
+	}
+
+	fmt.Printf("Num nodes >2: %d, >3: %d\n", numNodes2, numNodes3)
+	for _, graph_line := range mapTiles2d {
+		for _, graph_nde := range graph_line {
+			if graph_nde.nodeIndex > -1 {
+				fmt.Printf("X")
+				//fmt.Printf("X", graph_nde.tileChar)
+			} else {
+				//fmt.Printf(" ")
+				if graph_nde.isPath {
+					fmt.Printf("\u001b[31m%s\u001b[0m", graph_nde.tileChar)
+				} else {
+					fmt.Printf(" ")
+				}
+			}
+		}
+		fmt.Printf("\n")
+	}
 }
 
 func main() {
@@ -385,7 +428,7 @@ func main() {
 					pointStart = Point{int16(l_num), int16(c_num)}
 				}
 			}
-			graph_node_row = append(graph_node_row, MapTile{Point{int16(l_num), int16(c_num)}, isPath, string(node_char), false, -1, []Point{}, false})
+			graph_node_row = append(graph_node_row, MapTile{Point{int16(l_num), int16(c_num)}, isPath, string(node_char), false, -1, []Point{}, -1})
 		}
 		mapTiles2d = append(mapTiles2d, graph_node_row)
 	}
@@ -399,74 +442,25 @@ func main() {
 		return
 	}
 
-	getGraphNodes(mapTiles2d, GraphNode{pointStart, []GraphEdge{}}, GraphNode{pointEnd, []GraphEdge{}}, *part2)
-	numNodes2 := 0
-	numNodes3 := 0
-	for _, graphLine := range mapTiles2d {
-		for _, graphColumn := range graphLine {
-			dirs := []string{"U", "R", "D", "L"}
-			countPaths := 0
-			if !graphColumn.isPath {
-				continue
-			}
-			for _, dir := range dirs {
-				testPos := graphColumn.pos.move(dir, 1)
-				if testPos.x < 0 || testPos.y < 0 || int(testPos.x) >= len(graphLine) || int(testPos.y) >= len(mapTiles2d) {
-					continue
-				}
-				testItem := mapTiles2d[testPos.y][testPos.x]
-				if testItem.isPath {
-					countPaths += 1
-				}
-			}
-			if countPaths > 2 {
-				fmt.Printf("%d,%d: %d\n", graphColumn.pos.y, graphColumn.pos.x, countPaths)
-				mapTiles2d[graphColumn.pos.y][graphColumn.pos.x].isNode = true
-				numNodes2 += 1
-			}
-			if countPaths > 3 {
-				numNodes3 += 1
-			}
-		}
-	}
-
-	fmt.Printf("Num nodes >2: %d, >3: %d\n", numNodes2, numNodes3)
-	for _, graph_line := range mapTiles2d {
-		for _, graph_nde := range graph_line {
-			if graph_nde.isNode {
-				fmt.Printf("X")
-				//fmt.Printf("X", graph_nde.tileChar)
-			} else {
-				//fmt.Printf(" ")
-				if graph_nde.isPath {
-					fmt.Printf("\u001b[31m%s\u001b[0m", graph_nde.tileChar)
-				} else {
-					fmt.Printf(" ")
-				}
-			}
-		}
-		fmt.Printf("\n")
-	}
-	if true {
-		return
+	graphNodes := getGraphNodes(mapTiles2d, GraphNode{pointStart, []GraphEdge{}, 0, []Point{}}, GraphNode{pointEnd, []GraphEdge{}, -1, []Point{}}, *part2)
+	for i, nde := range graphNodes {
+		mapTiles2d[nde.pos.y][nde.pos.x].nodeIndex = i
 	}
 
 	fmt.Printf("Start point: %v\n", pointStart)
 	fmt.Printf("End point: %v\n", pointEnd)
 	mapTiles2d[pointStart.y][pointStart.x].highest_steps = 0
 
-	max_y := len(mapTiles2d) - 1
-	max_x := len(mapTiles2d[0]) - 1
+	//max_y := len(mapTiles2d) - 1
+	//max_x := len(mapTiles2d[0]) - 1
 
-	starting_node := PendingWalk{pointStart, 0, []Point{pointStart}}
+	starting_node := PendingWalk{pointStart, 0, []Point{pointStart}, []int{0}}
 
 	total := -1
 
 	pending_positions := make(LongestWalk, 0)
 	heap.Init(&pending_positions)
 	heap.Push(&pending_positions, starting_node)
-
-	valid_dirs := map[string][]string{".": {"U", "R", "D", "L"}, "^": {"U"}, ">": {"R"}, "v": {"D"}, "<": {"L"}}
 
 	visualiseSteps := []Point{}
 
@@ -475,100 +469,73 @@ func main() {
 		for pending_positions.Len() > 0 {
 			loop_num += 1
 
-			current_position := heap.Pop(&pending_positions).(PendingWalk)
+			currentWalk := heap.Pop(&pending_positions).(PendingWalk)
 
-			current_node := mapTiles2d[current_position.pos.y][current_position.pos.x]
-			//fmt.Printf("Cur: %v | %v\n", current_position, current_node)
-			//fmt.Printf("Len: %d, %d\n", pending_positions.Len(), current_position.steps)
-			//fmt.Printf("Len: %d, %d, %v\n", pending_positions.Len(), current_position.steps, nextPosition.history)
+			currentTile := mapTiles2d[currentWalk.pos.y][currentWalk.pos.x]
+			currentNode := graphNodes[currentTile.nodeIndex]
 
-			if !current_node.isPath {
+			//fmt.Printf("Current: w %v t %v n %v\n", currentWalk, currentTile, currentNode)
+
+			if currentNode.pos.x == pointEnd.x && currentNode.pos.y == pointEnd.y {
 				continue
 			}
 
-			if current_node.pos.x == pointEnd.x && current_node.pos.y == pointEnd.y {
-				fmt.Printf("Ending: %d | %v\n", current_node.highest_steps+15, current_node.pos)
-				continue
-			}
+			for _, edge := range currentNode.edges {
+                //fmt.Printf("Edge: %d -> %d\n", currentTile.nodeIndex, edge.connectionIndex)
+				nextNode := graphNodes[edge.connectionIndex]
+				nextSteps := currentWalk.steps + edge.weight
+                nextHistoryPath := []Point{}
+				nextHistoryPath = append(nextHistoryPath, currentWalk.history...)
+				nextHistoryPath = append(nextHistoryPath, edge.connectionPath...)
+				nextHistoryPath = append(nextHistoryPath, edge.connectionPoint)
+                nextHistoryNode := []int{}
+				nextHistoryNode = append(nextHistoryNode, currentWalk.historyNodes...)
+				nextHistoryNode = append(nextHistoryNode, edge.connectionIndex)
 
-			try_dirs, is_valid_dir := valid_dirs[current_node.tileChar]
-			if !is_valid_dir || *part2 {
-				try_dirs = []string{"R", "D", "L", "U"}
-			}
-			for _, dir := range try_dirs {
-				nextPosition := moveDirection(dir, current_position)
-
-				if nextPosition.pos.x < 0 || nextPosition.pos.y < 0 || nextPosition.pos.x > int16(max_x) || nextPosition.pos.y > int16(max_y) {
-					// Out of bounds
-					continue
-				}
-
-				nextNode := mapTiles2d[nextPosition.pos.y][nextPosition.pos.x]
-
-				if nextNode.visited {
-					// Already visited.
-					//continue
-				}
-
-				if !nextNode.isPath {
-					// Not a path, can't traverse.
-					continue
-				}
 
 				isVisited := false
-				for _, prevPos := range current_position.history {
-					if prevPos.x == nextNode.pos.x && prevPos.y == nextNode.pos.y {
+				for _, prevNodeIndex := range currentWalk.historyNodes {
+                    //fmt.Printf("Dupe? %d %d\n", prevNodeIndex, edge.connectionIndex)
+					if prevNodeIndex == edge.connectionIndex {
 						isVisited = true
 						break
 					}
 				}
 				if isVisited {
 					continue
-				}
-				//fmt.Printf("Next3: %s | %v | %v\n", dir, nextPosition, nextNode)
-
-				if nextPosition.steps > nextNode.highest_steps {
-					nextNode.highest_steps = nextPosition.steps
-					nextNode.highest_steps_path = nextPosition.history
-					//fmt.Printf("New highest: %d,%d: %d %d\n", nextNode.pos.y, nextNode.pos.x, nextNode.highest_steps, nextNode.highest_steps)
-					mapTiles2d[nextPosition.pos.y][nextPosition.pos.x] = nextNode
-
 				} else {
-					//fmt.Printf("Not highest: %d,%d: %d %d\n", nextNode.pos.y, nextNode.pos.x, nextNode.highest_steps, nextNode.highest_steps)
+                    //fmt.Printf("Nodupes: %v\n", nextHistoryNode)
+                }
+
+				if nextSteps > nextNode.highestSteps {
+					nextNode.highestSteps = nextSteps
+                    if nextNode.pos.x == pointEnd.x && nextNode.pos.y == pointEnd.y {
+                        // Save nodes for ending point.
+                        // No need to save them along the way.
+                        nextNode.highestStepsPath = nextHistoryPath
+                        fmt.Printf("Ending: %d %v\n", nextSteps, nextHistoryNode)
+                    }
+					graphNodes[edge.connectionIndex] = nextNode
 				}
 
-				heap.Push(&pending_positions, nextPosition)
+				heap.Push(&pending_positions, PendingWalk{nextNode.pos, nextSteps, nextHistoryPath, nextHistoryNode})
 
 			}
 		}
 
-		visualiseSteps = mapTiles2d[pointEnd.y][pointEnd.x].highest_steps_path
-		/*
-			for i_y, graph_line := range graph_nodes {
-				for i_x, graph_nde := range graph_line {
-					if graph_nde.lowest_cost < 10_000 {
-						fmt.Printf("%d:%3d|", graph_nde.cost, graph_nde.lowest_cost)
-					} else {
-						fmt.Printf("%d:   |", graph_nde.cost)
-					}
-					graph_nodes[i_y][i_x].visited_v = false
-					graph_nodes[i_y][i_x].visited_h = false
-				}
-				fmt.Printf("\n")
-			}
-		*/
+		endIndex := mapTiles2d[pointEnd.y][pointEnd.x].nodeIndex
+		visualiseSteps = graphNodes[endIndex].highestStepsPath
 
-		total = mapTiles2d[pointEnd.y][pointEnd.x].highest_steps
-		//*visualise = graph_nodes[ending_node.y][ending_node.x].highest_steps_path
+		total = graphNodes[endIndex].highestSteps
 
 		fmt.Printf("T: %d\n", total)
 
-        fmt.Printf("Path: %s\n", stepsStringify(visualiseSteps))
+		fmt.Printf("Path: %s\n", stepsStringify(visualiseSteps))
 	}
 
 	if len(*visualise) > 0 {
-        visualiseSteps = stepsParse(*visualise)
+		visualiseSteps = stepsParse(*visualise)
 	}
 
-    printVisitedGraph(mapTiles2d, visualiseSteps)
+	printVisitedGraph(mapTiles2d, visualiseSteps)
 }

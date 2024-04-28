@@ -51,9 +51,6 @@ type MapTile struct {
 	pos                Point
 	isPath             bool
 	tileChar           string
-	visited            bool
-	highest_steps      int
-	highest_steps_path []Point
 	nodeIndex          int
 }
 
@@ -110,24 +107,6 @@ func (lw *LongestWalk) Pop() any {
 	return item
 }
 
-func generatePositionKey(currentWalk PendingWalk) int64 {
-	currentPosKey := int64(0)
-
-	currentPosKey += int64(currentWalk.pos.y) << 16
-	currentPosKey += int64(currentWalk.pos.x)
-
-	return currentPosKey
-}
-
-func moveDirection(direction string, currentPos PendingWalk) PendingWalk {
-	nextPos := currentPos.pos.move(direction, 1)
-	nextHistory := []Point{}
-	nextHistory = append(nextHistory, currentPos.history...)
-	nextHistory = append(nextHistory, nextPos)
-	//fmt.Printf("MoveDir %s | %v | %v\n", direction, currentPos.history, nextHistory)
-	return PendingWalk{nextPos, currentPos.steps + 1, nextHistory, currentPos.historyNodes}
-}
-
 func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode GraphNode, ignoreTiles bool) []GraphNode {
 	pendingNodes := []GraphNodeDiscovery{{startingNode, "D"}}
 
@@ -144,8 +123,6 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 		currentNode := currentNodeDiscovery.node
 		pendingNodes = pendingNodes[1:]
 
-		//fmt.Printf("Node %d,%d from %s\n", currentNode.pos.y, currentNode.pos.x, currentNodeDiscovery.direction)
-
 	initDirLoop:
 		for _, initDir := range allDirs {
 			nextSteps := 1
@@ -155,12 +132,11 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 			history := []Point{}
 			isOneWay := false
 
-			if nextPos.y == endingNode.pos.y && nextPos.x == endingNode.pos.x {
+			if doPointsMatch(nextPos, endingNode.pos) {
 				fmt.Printf("Ending node\n")
 			}
 
 			for nextPosNotNode {
-				//fmt.Printf("Next pos: %d,%d | %s | %s\n", nextPos.y, nextPos.x, nextDir, currentNodeDiscovery.direction)
 
 				if nextPos.isInvalid(mapTiles2d) {
 					continue initDirLoop
@@ -212,7 +188,7 @@ func getGraphNodes(mapTiles2d [][]MapTile, startingNode GraphNode, endingNode Gr
 					nextSteps += 1
 					nextPos = nextPos.move(nextValidDirs[0], 1)
 					nextDir = nextValidDirs[0]
-				} else if numCandidateDirs == 2 || numCandidateDirs == 3 || (numCandidateDirs == 0 && nextPos.y == endingNode.pos.y && nextPos.x == endingNode.pos.x) {
+				} else if numCandidateDirs == 2 || numCandidateDirs == 3 || (numCandidateDirs == 0 && doPointsMatch(nextPos, endingNode.pos)) {
 					// Found a node
 					nextNodeNum := -1
 					currentNodeNum := -1
@@ -428,7 +404,7 @@ func main() {
 					pointStart = Point{int16(l_num), int16(c_num)}
 				}
 			}
-			graph_node_row = append(graph_node_row, MapTile{Point{int16(l_num), int16(c_num)}, isPath, string(node_char), false, -1, []Point{}, -1})
+			graph_node_row = append(graph_node_row, MapTile{Point{int16(l_num), int16(c_num)}, isPath, string(node_char), -1})
 		}
 		mapTiles2d = append(mapTiles2d, graph_node_row)
 	}
@@ -449,10 +425,6 @@ func main() {
 
 	fmt.Printf("Start point: %v\n", pointStart)
 	fmt.Printf("End point: %v\n", pointEnd)
-	mapTiles2d[pointStart.y][pointStart.x].highest_steps = 0
-
-	//max_y := len(mapTiles2d) - 1
-	//max_x := len(mapTiles2d[0]) - 1
 
 	starting_node := PendingWalk{pointStart, 0, []Point{pointStart}, []int{0}}
 
@@ -474,14 +446,11 @@ func main() {
 			currentTile := mapTiles2d[currentWalk.pos.y][currentWalk.pos.x]
 			currentNode := graphNodes[currentTile.nodeIndex]
 
-			//fmt.Printf("Current: w %v t %v n %v\n", currentWalk, currentTile, currentNode)
-
-			if currentNode.pos.x == pointEnd.x && currentNode.pos.y == pointEnd.y {
+			if doPointsMatch(currentNode.pos, pointEnd) {
 				continue
 			}
 
 			for _, edge := range currentNode.edges {
-                //fmt.Printf("Edge: %d -> %d\n", currentTile.nodeIndex, edge.connectionIndex)
 				nextNode := graphNodes[edge.connectionIndex]
 				nextSteps := currentWalk.steps + edge.weight
                 nextHistoryPath := []Point{}
@@ -495,7 +464,6 @@ func main() {
 
 				isVisited := false
 				for _, prevNodeIndex := range currentWalk.historyNodes {
-                    //fmt.Printf("Dupe? %d %d\n", prevNodeIndex, edge.connectionIndex)
 					if prevNodeIndex == edge.connectionIndex {
 						isVisited = true
 						break
@@ -507,7 +475,7 @@ func main() {
 
 				if nextSteps > nextNode.highestSteps {
 					nextNode.highestSteps = nextSteps
-                    if nextNode.pos.x == pointEnd.x && nextNode.pos.y == pointEnd.y {
+                    if doPointsMatch(nextNode.pos, pointEnd) {
                         // Save nodes for ending point.
                         // No need to save them along the way.
                         nextNode.highestStepsPath = nextHistoryPath

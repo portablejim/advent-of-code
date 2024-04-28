@@ -503,8 +503,6 @@ func main() {
 				}
 				if isVisited {
 					continue
-				} else {
-                    //fmt.Printf("Nodupes: %v\n", nextHistoryNode)
                 }
 
 				if nextSteps > nextNode.highestSteps {
@@ -513,7 +511,7 @@ func main() {
                         // Save nodes for ending point.
                         // No need to save them along the way.
                         nextNode.highestStepsPath = nextHistoryPath
-                        fmt.Printf("Ending: %d %v\n", nextSteps, nextHistoryNode)
+                        fmt.Printf("Ending: %d %v (ln %d)\n", nextSteps, nextHistoryNode, loop_num)
                     }
 					graphNodes[edge.connectionIndex] = nextNode
 				}
@@ -521,7 +519,11 @@ func main() {
 				heap.Push(&pending_positions, PendingWalk{nextNode.pos, nextSteps, nextHistoryPath, nextHistoryNode})
 
 			}
+            if loop_num % 1_000_000 == 0 {
+                fmt.Printf("Len: %d %d %d %v\n", len(pending_positions), currentWalk.steps, loop_num, currentWalk.historyNodes)
+            }
 		}
+        fmt.Printf("Final loop count: %d\n", loop_num)
 
 		endIndex := mapTiles2d[pointEnd.y][pointEnd.x].nodeIndex
 		visualiseSteps = graphNodes[endIndex].highestStepsPath

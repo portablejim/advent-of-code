@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-    gonum "github.com/shabbyrobe/go-num"
 )
 
 type Coord struct {
@@ -112,24 +111,24 @@ func findCollisionTime(hs1, hs2, hs3 Hailstone) int64 {
     fmt.Printf("%v\n", hs1)
     fmt.Printf("%v\n", hs2)
     fmt.Printf("%v\n", hs3)
-    x1, y1, z1, vx1, vy1, vz1 := gonum.I128From64(hs1.px), gonum.I128From64(hs1.py), gonum.I128From64(hs1.pz), gonum.I128From64(hs1.vx), gonum.I128From64(hs1.vy), gonum.I128From64(hs1.vz)
-    x2, y2, z2, vx2, vy2, vz2 := gonum.I128From64(hs2.px), gonum.I128From64(hs2.py), gonum.I128From64(hs2.pz), gonum.I128From64(hs2.vx), gonum.I128From64(hs2.vy), gonum.I128From64(hs2.vz)
-    x3, y3, z3, vx3, vy3, vz3 := gonum.I128From64(hs3.px), gonum.I128From64(hs3.py), gonum.I128From64(hs3.pz), gonum.I128From64(hs3.vx), gonum.I128From64(hs3.vy), gonum.I128From64(hs3.vz)
+    x1, y1, z1, vx1, vy1, vz1 := hs1.px, hs1.py, hs1.pz, hs1.vx, hs1.vy, hs1.vz
+    x2, y2, z2, vx2, vy2, vz2 := hs2.px, hs2.py, hs2.pz, hs2.vx, hs2.vy, hs2.vz
+    x3, y3, z3, vx3, vy3, vz3 := hs3.px, hs3.py, hs3.pz, hs3.vx, hs3.vy, hs3.vz
 
-    fmt.Printf("%d * %d, + %d * %d + %d * %d", y1, (z2.Sub(z3)),  y2, (z3.Sub(z1)), y3, (z1.Sub(z2)))
-    yz := y1.Mul(z2.Sub(z3)).Add(y2.Mul(z3.Sub(z1))).Add(y3.Mul(z1.Sub(z2)))
-    xz := x1.Mul(z3.Sub(z2)).Add(x2.Mul(z1.Sub(z3))).Add(x3.Mul(z2.Sub(z1)))
-    xy := x1.Mul(y2.Sub(y3)).Add(x2.Mul(y3.Sub(y1))).Add(x3.Mul(y1.Sub(y2)))
-    vxvy := vx1.Mul(vy2.Sub(vy3)).Add(vx2.Mul(vy3.Sub(vy1))).Add(vx3.Mul(vy1.Sub(vy2)))
-    vxvz := vx1.Mul(vz3.Sub(vz2)).Add(vx2.Mul(vz1.Sub(vz3))).Add(vx3.Mul(vz2.Sub(vz1)))
-    vyvz := vy1.Mul(vz2.Sub(vz3)).Add(vy2.Mul(vz3.Sub(vz1))).Add(vy3.Mul(vz1.Sub(vz2)))
+    fmt.Printf("%d * %d, + %d * %d + %d * %d", y1, (z2 - z3),  y2, (-z1 + z3), y3, (z1 - z2))
+    yz := y1*(z2 - z3) + y2*(-z1 + z3) + y3*(z1 - z2)
+    xz := x1*(-z2 + z3) + x2*(z1 - z3) + x3*(-z1 + z2)
+    xy := x1*(y2 - y3) + x2*(-y1 + y3) + x3*(y1 - y2)
+    vxvy := vx1*(vy2 - vy3) + vx2*(-vy1 + vy3) + vx3*(vy1 - vy2)
+    vxvz := vx1*(-vz2 + vz3) + vx2*(vz1 - vz3) + vx3*(-vz1 + vz2)
+    vyvz := vy1*(vz2 - vz3) + vy2*(-vz1 + vz3) + vy3*(vz1 - vz2)
 
-    n := (vx2.Sub(vx3)).Mul(yz).Add((vy2.Sub(vy3)).Mul(xz)).Add((vz2.Sub(vz3)).Mul(xy))
-    d := (z2.Sub(z3)).Mul(vxvy).Add((y2.Sub(y3)).Mul(vxvz)).Add((x2.Sub(x3)).Mul(vyvz))
+    n := (vx2 - vx3)*yz + (vy2 - vy3)*xz + (vz2 - vz3)*xy
+    d := (z2 - z3)*vxvy + (y2 - y3)*vxvz + (x2 - x3)*vyvz
 
-    fmt.Printf("n d: %d %d %d\n", n, d, n.AsInt64()/d.AsInt64())
+    fmt.Printf("n d: %d %d %d\n", n, d, n/d)
 
-    return int64(n.AsInt64()/d.AsInt64())
+    return int64(n/d)
 }
 
 func findRockPos(hailstoneList []Hailstone) (int64, int64, int64, bool) {

@@ -70,11 +70,9 @@ fn parse_answer(mut passed_weights: Vec<Vec<GraphWeight>>, finish_y: usize, fini
     let mut current_y = finish_y;
     let mut current_x = finish_x;
     let mut path = String::new();
-    let mut is_horizontal = if let finish_weight = passed_weights.get(current_y).unwrap().get(current_x).unwrap() {
+    let mut is_horizontal = {
+        let finish_weight = passed_weights.get(current_y).unwrap().get(current_x).unwrap();
         finish_weight.lowest_horizontal.cost < finish_weight.lowest_vertical.cost
-    }
-    else {
-        false
     };
 
     passed_weights.get_mut(current_y).unwrap().get_mut(current_x).unwrap().final_path = true;
@@ -97,7 +95,7 @@ fn parse_answer(mut passed_weights: Vec<Vec<GraphWeight>>, finish_y: usize, fini
                 Direction::WEST(c) => (1i16, 0i16, "W", c),
             };
 
-            for i in 0..d_count {
+            for _ in 0..d_count {
                 current_x = usize::try_from(i16::try_from(current_x).unwrap() + dx).unwrap();
                 current_y = usize::try_from(i16::try_from(current_y).unwrap() + dy).unwrap();
                 passed_weights.get_mut(current_y).unwrap().get_mut(current_x).unwrap().final_path = true;

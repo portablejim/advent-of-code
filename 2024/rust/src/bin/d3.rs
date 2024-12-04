@@ -1,7 +1,4 @@
-use std::{
-    io::{self, BufRead, Read},
-    iter,
-};
+use std::io::{self, BufRead};
 
 use regex::Regex;
 
@@ -31,10 +28,6 @@ fn main() {
     //println!("parsed finds: {:?}", parsed_finds);
 
     let disabled_regex = Regex::new(r"don't\(\).*?(do\(\))").unwrap();
-    let disabled_finds: Vec<String> = disabled_regex
-        .find_iter(&input_string)
-        .map(|caps| caps.as_str().to_owned())
-        .collect();
     let enabled_input = disabled_regex.replace_all(&input_string, "");
 
     let enabled_finds: Vec<String> = mul_regex
@@ -56,7 +49,6 @@ fn main() {
     let total_2: i32 = enabled_parsed_finds.iter().sum();
     //println!("disabled finds: {:?}", disabled_finds);
     //println!("enabled input: {:?}", enabled_input);
-
 
     println!("total 1: {:?}", total_1);
     println!("total 2: {:?}", total_2);

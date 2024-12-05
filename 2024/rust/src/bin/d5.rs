@@ -95,7 +95,7 @@ fn main() {
                 })
                 .count();
 
-            // Is valid if no falied rules.
+            // Is an invalid rule if any falied rules.
             return failed_rule_count > 0;
         })
         .cloned()

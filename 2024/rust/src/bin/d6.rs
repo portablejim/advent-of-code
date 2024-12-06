@@ -77,11 +77,11 @@ impl MapSquare {
             is_obstacle: self.is_obstacle,
             last_guard_dir_n: self.last_guard_dir_n
                 || last_dir.is_some_and(|d| d == Direction::NORTH(1)),
-            last_guard_dir_s: self.last_guard_dir_n
+            last_guard_dir_s: self.last_guard_dir_s
                 || last_dir.is_some_and(|d| d == Direction::SOUTH(1)),
-            last_guard_dir_e: self.last_guard_dir_n
+            last_guard_dir_e: self.last_guard_dir_e
                 || last_dir.is_some_and(|d| d == Direction::EAST(1)),
-            last_guard_dir_w: self.last_guard_dir_n
+            last_guard_dir_w: self.last_guard_dir_w
                 || last_dir.is_some_and(|d| d == Direction::WEST(1)),
         }
     }
@@ -92,7 +92,12 @@ impl MapSquare {
             Some(Direction::SOUTH(_)) => self.last_guard_dir_s,
             Some(Direction::EAST(_)) => self.last_guard_dir_e,
             Some(Direction::WEST(_)) => self.last_guard_dir_w,
-            None => false,
+            None => {
+                self.last_guard_dir_n
+                    || self.last_guard_dir_e
+                    || self.last_guard_dir_s
+                    || self.last_guard_dir_w
+            }
         }
     }
 }
@@ -100,21 +105,13 @@ impl MapSquare {
 impl Display for MapSquare {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_obstacle {
-            if self.last_guard_dir_n
-                || self.last_guard_dir_e
-                || self.last_guard_dir_s
-                || self.last_guard_dir_w
-            {
+            if self.has_visited(None) {
                 fmt::write(f, format_args!("!"))
             } else {
                 fmt::write(f, format_args!("#"))
             }
         } else {
-            if self.last_guard_dir_n
-                || self.last_guard_dir_e
-                || self.last_guard_dir_s
-                || self.last_guard_dir_w
-            {
+            if self.has_visited(None) {
                 fmt::write(f, format_args!("X"))
             } else {
                 fmt::write(f, format_args!(" "))
@@ -127,6 +124,98 @@ impl Display for MapSquare {
 struct DirectionPosition {
     pos: Pos,
     dir: Direction,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct GuardReport {
+    covered_tiles: Vec<Pos>,
+    loops: bool,
+}
+
+fn get_walked_positions(map_tiles: Vec<Vec<MapSquare>>) -> Vec<Pos> {
+    map_tiles
+        .iter()
+        .flat_map(|r| {
+            r.iter()
+                .filter(|c| c.has_visited(None))
+                .map(|c| c.pos)
+                .collect::<Vec<Pos>>()
+        })
+        .collect()
+}
+
+fn do_patrol(
+    start_guard_position: &DirectionPosition,
+    mut map_tiles: Vec<Vec<MapSquare>>,
+) -> GuardReport {
+    let mut guard_position = start_guard_position.clone();
+
+    loop {
+        let current_tile = find_pos_in_2d::<MapSquare>(&map_tiles, guard_position.pos)
+            .expect("Invalid tile")
+            .clone();
+
+        // Check if looped.
+        if current_tile.has_visited(Some(guard_position.dir)) {
+            return GuardReport {
+                covered_tiles: get_walked_positions(map_tiles),
+                loops: true,
+            };
+        }
+
+        // Get next square
+        let next_position = pos_move(guard_position.pos, guard_position.dir);
+
+        // Turn if against obstale.
+        let next_tile_option = find_pos_in_2d(&map_tiles, next_position);
+        if let Some(next_tile) = next_tile_option {
+            if next_tile.is_obstacle {
+                let next_guard_dir = match guard_position.dir {
+                    Direction::NORTH(n) => Direction::EAST(n),
+                    Direction::SOUTH(n) => Direction::WEST(n),
+                    Direction::EAST(n) => Direction::SOUTH(n),
+                    Direction::WEST(n) => Direction::NORTH(n),
+                };
+                guard_position = DirectionPosition {
+                    pos: guard_position.pos,
+                    dir: next_guard_dir,
+                };
+            } else {
+                // Mark square as visited.
+                let new_tile = &current_tile.set_guard_dir(Some(guard_position.dir));
+                map_tiles.get_mut(guard_position.pos.y as usize).and_then(
+                    |r: &mut Vec<MapSquare>| {
+                        Some(mem::replace(
+                            &mut r[guard_position.pos.x as usize],
+                            *new_tile,
+                        ))
+                    },
+                );
+
+                // Move
+                guard_position = DirectionPosition {
+                    pos: next_position,
+                    dir: guard_position.dir,
+                };
+            }
+        } else {
+            // Mark final square as visited.
+            let new_tile = &current_tile.set_guard_dir(Some(guard_position.dir));
+            map_tiles
+                .get_mut(guard_position.pos.y as usize)
+                .and_then(|r: &mut Vec<MapSquare>| {
+                    Some(mem::replace(
+                        &mut r[guard_position.pos.x as usize],
+                        *new_tile,
+                    ))
+                });
+
+            return GuardReport {
+                covered_tiles: get_walked_positions(map_tiles),
+                loops: false,
+            };
+        }
+    }
 }
 
 fn main() {
@@ -180,85 +269,39 @@ fn main() {
         map_tiles.push(row_data);
     }
 
-    let mut guard_position = start_guard_position.expect("Freedom! (Guard not found)");
+    let inital_guard_position = &start_guard_position.expect("Freedom! (Guard not found)");
+    let initial_patrol = do_patrol(inital_guard_position, map_tiles.clone());
 
-    loop {
-        let current_tile = find_pos_in_2d::<MapSquare>(&map_tiles, guard_position.pos)
-            .expect("Invalid tile")
-            .clone();
-
-        // Check if looped.
-        if current_tile.has_visited(Some(guard_position.dir)) {
-            println!("Finished by walking in circles.");
-            break;
-        }
-
-        // Get next square
-        let next_position = pos_move(guard_position.pos, guard_position.dir);
-
-        // Turn if against obstale.
-        let next_tile_option = find_pos_in_2d(&map_tiles, next_position);
-        if let Some(next_tile) = next_tile_option {
-            if next_tile.is_obstacle {
-                let next_guard_dir = match guard_position.dir {
-                    Direction::NORTH(n) => Direction::EAST(n),
-                    Direction::SOUTH(n) => Direction::WEST(n),
-                    Direction::EAST(n) => Direction::SOUTH(n),
-                    Direction::WEST(n) => Direction::NORTH(n),
-                };
-                guard_position = DirectionPosition {
-                    pos: guard_position.pos,
-                    dir: next_guard_dir,
-                };
-                current_tile.set_guard_dir(Some(guard_position.dir));
-            } else {
-                // Mark square as visited.
-                let new_tile = &current_tile.set_guard_dir(Some(guard_position.dir));
-                map_tiles.get_mut(guard_position.pos.y as usize).and_then(
-                    |r: &mut Vec<MapSquare>| {
-                        Some(mem::replace(
-                            &mut r[guard_position.pos.x as usize],
-                            *new_tile,
-                        ))
-                    },
-                );
-
-                // Move
-                guard_position = DirectionPosition {
-                    pos: next_position,
-                    dir: guard_position.dir,
-                };
-            }
-        }
-        else {
-            // Mark final square as visited.
-            let new_tile = &current_tile.set_guard_dir(Some(guard_position.dir));
-            map_tiles.get_mut(guard_position.pos.y as usize).and_then(
-                |r: &mut Vec<MapSquare>| {
+    let mut candidate_locations = initial_patrol.covered_tiles.clone();
+    candidate_locations.sort();
+    let valid_locations: Vec<Pos> = candidate_locations
+        .iter()
+        .filter(|candate_loc| **candate_loc != inital_guard_position.pos)
+        .filter(|candidate_loc| {
+            let mut candidate_tiles = map_tiles.clone();
+            let mut tile_to_modify = find_pos_in_2d(&candidate_tiles, **candidate_loc)
+                .expect("Returned tiles should be valid")
+                .clone();
+            assert!(tile_to_modify.is_obstacle == false);
+            tile_to_modify.is_obstacle = true;
+            candidate_tiles
+                .get_mut(candidate_loc.y as usize)
+                .and_then(|r: &mut Vec<MapSquare>| {
                     Some(mem::replace(
-                        &mut r[guard_position.pos.x as usize],
-                        *new_tile,
+                        &mut r[candidate_loc.x as usize],
+                        tile_to_modify.clone(),
                     ))
-                },
-            );
+                });
+            let patrol_outcome = do_patrol(inital_guard_position, candidate_tiles);
 
-            println!("Finished by exiting area.");
-            break;
-        }
-    }
-    let mut total_1: i32 = 0;
-    for r in 0..map_tiles.len() {
-        let row_str = &map_tiles[r];
-        for c in 0..map_tiles.len() {
-            let visited = row_str[c].last_guard_dir_n || row_str[c].last_guard_dir_e || row_str[c].last_guard_dir_s || row_str[c].last_guard_dir_w;
-            if visited {
-                total_1 += 1;
-            }
-        }
-        //println!("{:?}", row_str)
-    }
+            return patrol_outcome.loops;
+        })
+        .cloned()
+        .collect();
 
-    let total_2: i32 = 0;
+    let total_1: i32 = initial_patrol.covered_tiles.len() as i32;
+
+    let total_2: i32 = valid_locations.len() as i32;
 
     println!("total 1: {:?}", total_1);
     println!("total 2: {:?}", total_2);

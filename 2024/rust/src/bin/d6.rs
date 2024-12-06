@@ -1,3 +1,9 @@
+/**
+ * Day 6: Guard Gallivant
+ *
+ * For part 2, does brute force checking along the path.
+ *
+ */
 use std::{
     fmt::{self, Display},
     io::{self, BufRead},
@@ -272,6 +278,9 @@ fn main() {
     let inital_guard_position = &start_guard_position.expect("Freedom! (Guard not found)");
     let initial_patrol = do_patrol(inital_guard_position, map_tiles.clone());
 
+    let total_1: i32 = initial_patrol.covered_tiles.len() as i32;
+    println!("total 1: {:?}", total_1);
+
     let mut candidate_locations = initial_patrol.covered_tiles.clone();
     candidate_locations.sort();
     let valid_locations: Vec<Pos> = candidate_locations
@@ -299,10 +308,6 @@ fn main() {
         .cloned()
         .collect();
 
-    let total_1: i32 = initial_patrol.covered_tiles.len() as i32;
-
     let total_2: i32 = valid_locations.len() as i32;
-
-    println!("total 1: {:?}", total_1);
     println!("total 2: {:?}", total_2);
 }
